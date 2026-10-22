@@ -162,6 +162,16 @@ input.buscar{margin-bottom:10px}
 .fila-color b{width:90px;flex-shrink:0;text-transform:capitalize;font-size:14px}
 .fila-color input[type=text]{flex:1}
 input[type=color]{width:44px;height:40px;border:1.5px solid var(--line);border-radius:10px;padding:2px;background:#fff;flex-shrink:0}
+/* ---- instalar ---- */
+.instalar{background:linear-gradient(135deg,var(--pri),#0f172a);color:#fff;border-radius:var(--r);padding:14px;margin-bottom:12px;display:flex;gap:12px;align-items:center}
+.instalar img{width:48px;height:48px;border-radius:12px;flex-shrink:0}
+.instalar .t{flex:1;font-size:14px}
+.instalar .t b{display:block;font-size:15px;margin-bottom:2px}
+.instalar .x{background:none;border:0;color:#fff;opacity:.7;font-size:18px;cursor:pointer;align-self:flex-start}
+.instalar .btn{background:#fff;color:var(--pri);padding:8px 12px;font-size:13px}
+.pasos-ios{counter-reset:p;padding:0;margin:0;list-style:none}
+.pasos-ios li{counter-increment:p;display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.pasos-ios li:before{content:counter(p);background:var(--pri);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
 /* ---- toast/loader ---- */
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 90px);transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;z-index:100;max-width:90vw;box-shadow:var(--sh);transition:opacity .2s}
 #toast.err{background:var(--bad)}
@@ -411,6 +421,7 @@ function abrirPerfil(){
     </div>
     <label class="campo"><span>Cambiar mi nombre</span><input type="text" id="pfNombre" value="${esc(D.yo.nombre)}"></label>
     <button class="btn full" onclick="accion('actualizarMiNombre',{nombre:$('#pfNombre').value},'Nombre actualizado')">Guardar nombre</button>
+    ${!esInstalada()?'<button class="btn sec full" style="margin-top:10px" onclick="cerrarModal();instalarApp()">📲 Instalar en mi celular</button>':''}
     <button class="btn bad full" style="margin-top:10px" onclick="salir()">Cerrar sesión</button>`);
 }
 async function salir(){
@@ -488,7 +499,7 @@ function vistaCalendario(){
     lista=D.eventos.filter(e=>e.fecha>=h && e.estado!=='rechazado'); tituloLista='Próximos eventos';
   }
   const f=(k,t)=>`<button class="${!diaSel&&filtroLista===k?'act':''}" onclick="filtroLista='${k}';diaSel=null;pintar()">${t}</button>`;
-  return `<div class="cal-top">
+  return `${bannerInstalar()}<div class="cal-top">
       <button onclick="moverMes(-1)">‹</button><h2>${MESES[m]} ${y}</h2>
       <button class="hoy" onclick="mesVista=new Date();mesVista.setDate(1);diaSel=hoy();pintar()">Hoy</button>
       <button onclick="moverMes(1)">›</button></div>
@@ -1115,6 +1126,49 @@ async function publicarAviso(){
   const texto=$('#avTexto').value.trim(), f=$('#avFoto').files[0], fijar=!!($('#avFijar')&&$('#avFijar').checked);
   if(!texto && !f) return toast('Escribe el aviso',true);
   await correr(async()=>{ const archivo=await leerArchivo(f); await api('publicarAviso',{texto,archivo,fijar}); await recargar(); },'Aviso publicado');
+}
+
+/* ==================== INSTALAR APP ==================== */
+let promptInstalar = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; if(D && tab==='cal') pintar(); });
+window.addEventListener('appinstalled', () => { promptInstalar=null; ls.set('cg_inst_no','1'); toast('¡App instalada! Ya la tienes en tu pantalla de inicio'); if(D) pintar(); });
+const esInstalada = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const esIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const esNavInterno = () => /FBAN|FBAV|Instagram|WhatsApp|Line\/|wv\)/i.test(navigator.userAgent);
+function bannerInstalar(){
+  if(esInstalada() || ls.get('cg_inst_no')) return '';
+  return `<div class="instalar"><img src="icon-192.png" alt="">
+    <div class="t"><b>Instala la app en tu celular</b>Ábrela desde tu pantalla de inicio, como cualquier app.</div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      <button class="x" onclick="ls.set('cg_inst_no','1');pintar()" aria-label="Cerrar">✕</button>
+      <button class="btn" onclick="instalarApp()">Instalar</button></div></div>`;
+}
+async function instalarApp(){
+  if(promptInstalar){
+    promptInstalar.prompt();
+    const r = await promptInstalar.userChoice; promptInstalar=null;
+    if(r.outcome==='accepted') ls.set('cg_inst_no','1');
+    pintar(); return;
+  }
+  let pasos;
+  if(esNavInterno()){
+    pasos=`<div class="aviso amarillo">Abriste el enlace dentro de otra app (WhatsApp, Facebook…). Desde ahí no se puede instalar.</div>
+      <ol class="pasos-ios"><li>Toca los tres puntos <b>⋮</b> o el ícono de compartir arriba.</li>
+      <li>Elige <b>Abrir en Chrome</b> (o <b>Abrir en Safari</b> en iPhone).</li>
+      <li>Ya en el navegador, toca otra vez <b>Instalar</b>.</li></ol>`;
+  } else if(esIOS()){
+    pasos=`<ol class="pasos-ios"><li>Asegúrate de estar en <b>Safari</b>.</li>
+      <li>Toca el botón <b>Compartir</b> <span style="font-size:18px">⬆️</span> (el cuadro con flecha, abajo o arriba de la pantalla).</li>
+      <li>Desliza y elige <b>Agregar a inicio</b> ➕.</li>
+      <li>Toca <b>Agregar</b>. El ícono de UPMYS aparecerá en tu pantalla de inicio.</li></ol>`;
+  } else {
+    pasos=`<ol class="pasos-ios"><li>Abre esta página en <b>Google Chrome</b>.</li>
+      <li>Toca los tres puntos <b>⋮</b> arriba a la derecha.</li>
+      <li>Elige <b>Instalar app</b> o <b>Agregar a pantalla principal</b>.</li>
+      <li>Confirma con <b>Instalar</b>. El ícono de UPMYS aparecerá con tus apps.</li></ol>`;
+  }
+  abrirModal('Instalar en tu celular', `<div style="text-align:center;margin-bottom:12px"><img src="icon-192.png" style="width:72px;border-radius:16px" alt=""></div>${pasos}
+    <button class="btn full" style="margin-top:14px" onclick="cerrarModal()">Entendido</button>`);
 }
 
 iniciar();
