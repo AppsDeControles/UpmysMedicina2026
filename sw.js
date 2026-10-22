@@ -1,4 +1,4 @@
-const CACHE='calendario-v5';
+const CACHE='calendario-v6';
 const BASE=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./cargando.svg','./cargando-caida.svg','./cargando-letras.svg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(BASE)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim();});
