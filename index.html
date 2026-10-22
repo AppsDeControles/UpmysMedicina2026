@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Calendario del Grupo</title>
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color" content="#0154a3">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --pri:#4f46e5;--pri2:#eef2ff;--txt:#0f172a;--sub:#64748b;--line:#e2e8f0;--bg:#f6f7fb;--card:#fff;
+  --pri:#0154a3;--pri2:#e6eef8;--txt:#0f172a;--sub:#64748b;--line:#e2e8f0;--bg:#f6f7fb;--card:#fff;
   --ok:#16a34a;--okbg:#dcfce7;--bad:#dc2626;--badbg:#fee2e2;--warn:#b45309;--warnbg:#fef3c7;
   --r:16px;--sh:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.06);
 }
@@ -21,7 +21,7 @@ html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,syste
 button,input,select,textarea{font:inherit;color:inherit}
 .oculto{display:none!important}
 /* ---- login ---- */
-#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,#4f46e5,#7c3aed 60%,#db2777)}
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,#0154a3,#013a73)}
 .login-card{background:#fff;border-radius:24px;padding:28px 22px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,.25);text-align:center}
 .login-card h1{font-size:22px;margin:10px 0 4px}
 .login-card p{color:var(--sub);margin:0 0 20px;font-size:14px}
@@ -39,7 +39,7 @@ nav button{flex:1;background:none;border:0;padding:6px 2px;display:flex;flex-dir
 nav button .ic{font-size:21px;line-height:1}
 nav button.act{color:var(--pri);font-weight:700}
 .badge{position:absolute;top:0;right:calc(50% - 22px);background:var(--bad);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-weight:700}
-.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 76px);width:56px;height:56px;border-radius:18px;border:0;background:var(--pri);color:#fff;font-size:28px;box-shadow:0 8px 22px rgba(79,70,229,.45);cursor:pointer;z-index:19}
+.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 76px);width:56px;height:56px;border-radius:18px;border:0;background:var(--pri);color:#fff;font-size:28px;box-shadow:0 8px 22px rgba(15,23,42,.3);cursor:pointer;z-index:19}
 /* ---- comunes ---- */
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:14px;margin-bottom:12px}
 .titulo-sec{font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin:18px 4px 8px;display:flex;justify-content:space-between;align-items:center}
@@ -141,7 +141,7 @@ textarea{min-height:80px;resize:vertical}
 .item:last-child{border-bottom:0}
 .item .cuerpo{flex:1;min-width:0}
 .mini{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#e2e8f0;cursor:pointer;flex-shrink:0}
-.banco{background:linear-gradient(135deg,#1e1b4b,#4f46e5);color:#fff;border-radius:16px;padding:16px;margin-bottom:14px}
+.banco{background:linear-gradient(135deg,#0f172a,var(--pri));color:#fff;border-radius:16px;padding:16px;margin-bottom:14px}
 .banco .dato{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.15)}
 .banco .dato:last-child{border-bottom:0}
 .banco small{opacity:.75;font-size:11px;display:block}
@@ -149,6 +149,19 @@ textarea{min-height:80px;resize:vertical}
 .banco button{border:0;background:rgba(255,255,255,.18);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;flex-shrink:0}
 .grande{font-size:32px;font-weight:800;margin:4px 0}
 input.buscar{margin-bottom:10px}
+/* ---- tema del mes / avisos ---- */
+.mes-tema{color:#fff;border-radius:14px;padding:10px 14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;text-transform:none}
+.mes-tema small{font-weight:500;opacity:.85;display:block}
+.aviso-card .top{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.aviso-card .av{width:36px;height:36px;border-radius:50%;background:var(--pri2);color:var(--pri);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.aviso-card .txt{white-space:pre-wrap;word-break:break-word;line-height:1.45}
+.aviso-card img.foto{width:100%;max-height:360px;object-fit:cover;border-radius:12px;margin-top:10px;cursor:pointer;background:#e2e8f0}
+.aviso-card.fijo{border:2px solid var(--pri)}
+.fila-color{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.fila-color:last-child{border-bottom:0}
+.fila-color b{width:90px;flex-shrink:0;text-transform:capitalize;font-size:14px}
+.fila-color input[type=text]{flex:1}
+input[type=color]{width:44px;height:40px;border:1.5px solid var(--line);border-radius:10px;padding:2px;background:#fff;flex-shrink:0}
 /* ---- toast/loader ---- */
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 90px);transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;z-index:100;max-width:90vw;box-shadow:var(--sh);transition:opacity .2s}
 #toast.err{background:var(--bad)}
@@ -196,6 +209,7 @@ input.buscar{margin-bottom:10px}
   <nav>
     <button data-tab="cal" onclick="irTab('cal')"><span class="ic">📅</span>Calendario</button>
     <button data-tab="cuentas" onclick="irTab('cuentas')"><span class="ic">💰</span>Cuentas</button>
+    <button data-tab="avisos" onclick="irTab('avisos')"><span class="ic">📢</span>Avisos<span class="badge oculto" id="badgeAvisos"></span></button>
     <button data-tab="fondo" onclick="irTab('fondo')"><span class="ic">🏦</span>Fondo</button>
     <button data-tab="admin" id="navAdmin" class="oculto" onclick="irTab('admin')"><span class="ic">⚙️</span>Admin<span class="badge oculto" id="badgeAdmin"></span></button>
   </nav>
@@ -212,6 +226,7 @@ document.getElementById('splashImg').src=n%2?'cargando-letras.svg':'cargando-cai
 /* ==================== CONFIGURACIÓN ==================== */
 const API_URL = 'https://script.google.com/macros/s/AKfycby0BxBIpoxLCc5W1axMRuHKH82TyyyEGbE-2AdaNt1Z8ExmiYtjc4TKdNSFGTMcKV7WLg/exec';
 
+const COLORES_BASE = {'Tarea grupal':'#2563eb','Festejo':'#db2777','Participación':'#16a34a','Evento obligatorio':'#dc2626','Reunión':'#7c3aed','Otro':'#64748b'};
 const COLORES = {'Tarea grupal':'#2563eb','Festejo':'#db2777','Participación':'#16a34a','Evento obligatorio':'#dc2626','Reunión':'#7c3aed','Otro':'#64748b'};
 const ICONOS  = {'Tarea grupal':'🧹','Festejo':'🎉','Participación':'🙋','Evento obligatorio':'❗','Reunión':'🗣️','Otro':'📌'};
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -407,7 +422,9 @@ async function salir(){
 function irTab(t){ tab=t; window.scrollTo(0,0); pintar(); }
 function pintar(){
   if(!D) return;
+  aplicarTema();
   $('#hdrAvatar').textContent = iniciales(D.yo.nombre);
+  const nAv = avisosNuevos(); const ba=$('#badgeAvisos'); ba.textContent=nAv; ba.classList.toggle('oculto',!nAv||tab==='avisos');
   $('#navAdmin').classList.toggle('oculto',!D.yo.admin);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.tab===tab));
   if(D.yo.admin){
@@ -415,9 +432,9 @@ function pintar(){
     const b=$('#badgeAdmin'); b.textContent=n; b.classList.toggle('oculto',!n);
   }
   $('#fab').classList.toggle('oculto', tab!=='cal');
-  const v = {cal:vistaCalendario, cuentas:vistaCuentas, fondo:vistaFondo, admin:vistaAdmin}[tab];
+  const v = {cal:vistaCalendario, cuentas:vistaCuentas, avisos:vistaAvisos, fondo:vistaFondo, admin:vistaAdmin}[tab];
   $('#vista').innerHTML = v ? v() : '';
-  $('#hdrTitulo').textContent = {cal:'Calendario',cuentas:'Cuentas',fondo:'Fondo grupal',admin:'Administración'}[tab];
+  $('#hdrTitulo').textContent = {cal:'Calendario',cuentas:'Cuentas',avisos:'Tablero de avisos',fondo:'Fondo grupal',admin:'Administración'}[tab];
 }
 
 /* ==================== CALENDARIO ==================== */
@@ -475,6 +492,7 @@ function vistaCalendario(){
       <button onclick="moverMes(-1)">‹</button><h2>${MESES[m]} ${y}</h2>
       <button class="hoy" onclick="mesVista=new Date();mesVista.setDate(1);diaSel=hoy();pintar()">Hoy</button>
       <button onclick="moverMes(1)">›</button></div>
+    ${bannerMes(m)}
     <div class="grid">${g}</div>
     <div class="leyenda">${Object.keys(COLORES).map(t=>`<span><i class="punto" style="background:${COLORES[t]}"></i>${t}</span>`).join('')}<span><i class="punto prop"></i>Propuesta</span></div>
     <div class="filtros">${f('proximos','Próximos')}${f('debo','Debo')}${f('pasados','Pasados')}${f('mios','Mis propuestas')}</div>
@@ -942,6 +960,21 @@ function vistaAdmin(){
       <tr class="clic" onclick="formPersona('${p.id}')"><td><b>${esc(p.nombre)}</b><div class="sub">${p.email?esc(p.email):'Sin cuenta (solo en listas)'}</div></td>
       <td class="der">${p.rol==='admin'?'<span class="chip pri">Admin</span> ':''}${!p.activo?'<span class="chip gris">Inactivo</span>':''}</td></tr>`).join('')}</table></div>
 
+    ${D.bloqueados.length?`<div class="titulo-sec"><span>Correos bloqueados (${D.bloqueados.length})</span></div>
+    <div class="card" style="padding:4px 12px">${D.bloqueados.map(e=>`<div class="item"><div class="cuerpo">${esc(e)}</div>
+      <button class="btn chico gris" onclick="accion('desbloquearCorreo',{email:'${jsq(e)}'},'Correo desbloqueado',false)">Desbloquear</button></div>`).join('')}</div>`:''}
+
+    <div class="titulo-sec"><span>Personalización</span></div>
+    <div class="card">
+      <div class="fila-btn" style="margin-top:0"><button class="btn sec" onclick="formColores()">🎨 Colores</button><button class="btn sec" onclick="formMeses()">🎗️ Tema de cada mes</button></div>
+      <label class="campo" style="margin:14px 0 0"><span>Moderador del tablero de avisos</span>
+        <select onchange="accion('guardarPersonalizacion',{moderador:this.value},'Moderador actualizado',false)">
+          <option value="">— Sin moderador —</option>
+          ${D.personas.filter(p=>p.activo&&p.tieneCuenta&&p.id!==D.yo.id).map(p=>`<option value="${p.id}" ${p.id===D.moderador?'selected':''}>${esc(p.nombre)}</option>`).join('')}
+        </select></label>
+      <div class="sub" style="margin-top:6px">Además de ti, el moderador puede borrar y fijar avisos.</div>
+    </div>
+
     <div class="titulo-sec"><span>Datos para transferencias</span></div>
     <form class="card" onsubmit="return guardarBanco(event)">
       <label class="campo"><span>Titular</span><input type="text" name="titular" value="${esc(b.titular)}"></label>
@@ -975,12 +1008,113 @@ function formPersona(id){
       </div>
       <button class="btn full" type="submit">Guardar</button>
       ${id?`<button type="button" class="btn gris full" style="margin-top:8px" onclick="cerrarModal();verPersona('${id}')">Ver estado de cuenta</button>`:''}
+      ${id && id!==D.yo.id?`<button type="button" class="btn bad full" style="margin-top:8px" onclick="confirmarBorrarPersona('${id}')">🗑 Eliminar cuenta</button>`:''}
     </form>`);
 }
 function enviarPersona(e,id){
   e.preventDefault(); const f=e.target;
   accion('guardarPersona',{id:id||null,nombre:f.nombre.value,email:f.email.value,rol:f.rol.value,activo:f.activo.value==='si'},'Persona guardada');
   return false;
+}
+
+/* ==================== TEMA Y MESES ==================== */
+function mezcla(a,b,f){
+  const h=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));
+  const A=h(a),B=h(b); return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*f).toString(16).padStart(2,'0')).join('');
+}
+function aplicarTema(){
+  const t=D.tema||{}, pri=/^#[0-9a-f]{6}$/i.test(t.pri||'')?t.pri:'#0154a3', st=document.documentElement.style;
+  st.setProperty('--pri',pri); st.setProperty('--pri2',mezcla(pri,'#ffffff',.88));
+  const mt=document.querySelector('meta[name=theme-color]'); if(mt) mt.content=pri;
+  Object.keys(COLORES_BASE).forEach(k=>{ COLORES[k]=(t.tipos&&t.tipos[k])||COLORES_BASE[k]; });
+}
+function bannerMes(m){
+  const t=(D.meses||{})[m+1]; if(!t||!t.titulo) return '';
+  return `<div class="mes-tema" style="background:${esc(t.color||'#0154a3')}">🎗️<div><small style="text-transform:capitalize">${MESES[m]}</small>${esc(t.titulo)}</div></div>`;
+}
+function formColores(){
+  const t=D.tema||{};
+  abrirModal('Colores de la app', `<form id="fCol" onsubmit="return guardarColores(event)">
+    <div class="card"><div class="fila-color"><b>Principal</b><input type="color" name="pri" value="${esc(t.pri||'#0154a3')}"><span class="sub">Encabezado, botones y menú</span></div></div>
+    <div class="titulo-sec"><span>Tipos de evento</span></div>
+    <div class="card">${Object.keys(COLORES_BASE).map(k=>`<div class="fila-color"><b style="width:auto;flex:1;text-transform:none">${ICONOS[k]} ${k}</b><input type="color" data-tipo="${k}" value="${COLORES[k]}"></div>`).join('')}</div>
+    <button class="btn full" type="submit">Guardar colores</button>
+    <button class="btn gris full" type="button" style="margin-top:8px" onclick="accion('guardarPersonalizacion',{tema:{}},'Colores restablecidos')">Restablecer colores originales</button>
+  </form>`);
+}
+function guardarColores(e){
+  e.preventDefault(); const f=e.target, tipos={};
+  f.querySelectorAll('input[data-tipo]').forEach(i=>tipos[i.dataset.tipo]=i.value);
+  accion('guardarPersonalizacion',{tema:{pri:f.pri.value,tipos}},'Colores guardados');
+  return false;
+}
+function formMeses(){
+  const ms=D.meses||{};
+  abrirModal('Tema de cada mes', `<div class="aviso">Se muestra como franja arriba del calendario en ese mes, cada año. Deja vacío el mes que no tenga tema.</div>
+    <form id="fMes" onsubmit="return guardarMeses(event)"><div class="card">
+    ${MESES.map((n,i)=>{const v=ms[i+1]||{}; return `<div class="fila-color"><b>${n}</b><input type="text" name="t${i+1}" value="${esc(v.titulo||'')}" placeholder="Ej. Mes Rosa"><input type="color" name="c${i+1}" value="${esc(v.color||'#0154a3')}"></div>`}).join('')}
+    </div><button class="btn full" type="submit">Guardar temas</button></form>`);
+}
+function guardarMeses(e){
+  e.preventDefault(); const f=e.target, meses={};
+  for(let i=1;i<=12;i++){ const t=f['t'+i].value.trim(); if(t) meses[i]={titulo:t,color:f['c'+i].value}; }
+  accion('guardarPersonalizacion',{meses},'Temas guardados');
+  return false;
+}
+
+/* ==================== CUENTAS: ELIMINAR ==================== */
+function confirmarBorrarPersona(id){
+  const p=persona(id);
+  abrirModal('Eliminar cuenta', `<div class="aviso amarillo">Se eliminará a <b>${esc(p.nombre)}</b> de la lista, de los eventos y del tablero de avisos.
+    Si ya tiene pagos registrados no se podrá borrar; en ese caso márcala como <b>Inactiva</b>.</div>
+    ${p.email?`<div class="lista-check" style="margin-bottom:12px"><label><input type="checkbox" id="bpBloq" checked> Bloquear ${esc(p.email)} para que no vuelva a entrar</label></div>`:''}
+    <button class="btn bad full" onclick="borrarPersona('${id}')">Eliminar definitivamente</button>
+    <button class="btn gris full" style="margin-top:8px" onclick="cerrarModal()">Cancelar</button>`);
+}
+function borrarPersona(id){
+  const bloquear=!!($('#bpBloq')&&$('#bpBloq').checked);
+  correr(async()=>{ await api('borrarPersona',{id,bloquear}); cerrarModal(); cerrarModal(); await recargar(); },'Cuenta eliminada');
+}
+
+/* ==================== TABLERO DE AVISOS ==================== */
+const puedeModerar = () => D.yo.admin || D.yo.moderador;
+function avisosNuevos(){
+  if(!D.avisos) return 0;
+  const visto=ls.get('cg_avisos_visto')||'';
+  return D.avisos.filter(a=>a.fecha>visto && a.personaId!==D.yo.id).length;
+}
+function vistaAvisos(){
+  if(D.avisos.length) ls.set('cg_avisos_visto', D.avisos.reduce((m,a)=>a.fecha>m?a.fecha:m,''));
+  $('#badgeAvisos').classList.add('oculto');
+  const lista=D.avisos.filter(a=>a.fijado).concat(D.avisos.filter(a=>!a.fijado));
+  return `<div class="card">
+      <textarea id="avTexto" placeholder="Escribe un aviso para el grupo…" maxlength="2000"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <label class="btn chico gris">📷 Foto<input type="file" id="avFoto" accept="image/*" class="oculto" onchange="$('#avFotoNom').textContent=this.files[0]?this.files[0].name:''"></label>
+        <span class="sub" id="avFotoNom" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        ${puedeModerar()?'<label class="sub" style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="avFijar"> Fijar</label>':''}
+        <button class="btn chico" onclick="publicarAviso()">Publicar</button>
+      </div></div>
+    ${D.yo.moderador?'<div class="aviso">Eres moderador: puedes borrar y fijar avisos de cualquier persona.</div>':''}
+    ${lista.length?lista.map(itemAviso).join(''):'<div class="card vacio">Aún no hay avisos. ¡Publica el primero!</div>'}`;
+}
+function itemAviso(a){
+  return `<div class="card aviso-card ${a.fijado?'fijo':''}">
+    <div class="top"><div class="av">${esc(iniciales(a.nombre))}</div>
+      <div style="flex:1;min-width:0"><b>${esc(a.nombre)}</b><div class="sub">${esc(a.fecha)}</div></div>
+      ${a.fijado?'<span class="chip pri">📌 Fijado</span>':''}</div>
+    ${a.texto?`<div class="txt">${esc(a.texto)}</div>`:''}
+    ${a.archivoId?`<img class="foto" src="${thumb(a.archivoId,1000)}" loading="lazy" onclick="verArchivo('${a.archivoId}')" alt="">`:''}
+    ${(a.puedeBorrar||puedeModerar())?`<div class="fila-btn">
+      ${puedeModerar()?`<button class="btn chico gris" onclick="accion('fijarAviso',{id:'${a.id}',fijar:${!a.fijado}},'${a.fijado?'Aviso desfijado':'Aviso fijado'}',false)">${a.fijado?'Desfijar':'📌 Fijar'}</button>`:''}
+      ${a.puedeBorrar?`<button class="btn chico bad" onclick="if(confirm('¿Borrar este aviso?'))accion('borrarAviso',{id:'${a.id}'},'Aviso borrado',false)">🗑 Borrar</button>`:''}
+    </div>`:''}
+  </div>`;
+}
+async function publicarAviso(){
+  const texto=$('#avTexto').value.trim(), f=$('#avFoto').files[0], fijar=!!($('#avFijar')&&$('#avFijar').checked);
+  if(!texto && !f) return toast('Escribe el aviso',true);
+  await correr(async()=>{ const archivo=await leerArchivo(f); await api('publicarAviso',{texto,archivo,fijar}); await recargar(); },'Aviso publicado');
 }
 
 iniciar();
