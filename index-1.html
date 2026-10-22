@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calendario del Grupo</title>
+<meta name="theme-color" content="#4f46e5">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --pri:#4f46e5;--pri2:#eef2ff;--txt:#0f172a;--sub:#64748b;--line:#e2e8f0;--bg:#f6f7fb;--card:#fff;
+  --ok:#16a34a;--okbg:#dcfce7;--bad:#dc2626;--badbg:#fee2e2;--warn:#b45309;--warnbg:#fef3c7;
+  --r:16px;--sh:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+button,input,select,textarea{font:inherit;color:inherit}
+.oculto{display:none!important}
+/* ---- login ---- */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,#4f46e5,#7c3aed 60%,#db2777)}
+.login-card{background:#fff;border-radius:24px;padding:28px 22px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,.25);text-align:center}
+.login-card h1{font-size:22px;margin:10px 0 4px}
+.login-card p{color:var(--sub);margin:0 0 20px;font-size:14px}
+.logo{width:64px;height:64px;border-radius:18px;background:var(--pri2);display:inline-flex;align-items:center;justify-content:center;font-size:34px}
+.sep{display:flex;align-items:center;gap:10px;color:var(--sub);font-size:12px;margin:18px 0}
+.sep:before,.sep:after{content:"";flex:1;height:1px;background:var(--line)}
+#gbtn{display:flex;justify-content:center;min-height:44px}
+/* ---- app ---- */
+header{position:sticky;top:0;z-index:20;background:var(--pri);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;align-items:center;gap:10px}
+header h1{font-size:17px;margin:0;flex:1;font-weight:700}
+.avatar{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:0;color:#fff;font-weight:700;cursor:pointer}
+main{padding:14px 14px 110px;max-width:760px;margin:0 auto}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;padding:6px 6px calc(env(safe-area-inset-bottom) + 6px);z-index:20}
+nav button{flex:1;background:none;border:0;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--sub);cursor:pointer;position:relative}
+nav button .ic{font-size:21px;line-height:1}
+nav button.act{color:var(--pri);font-weight:700}
+.badge{position:absolute;top:0;right:calc(50% - 22px);background:var(--bad);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-weight:700}
+.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 76px);width:56px;height:56px;border-radius:18px;border:0;background:var(--pri);color:#fff;font-size:28px;box-shadow:0 8px 22px rgba(79,70,229,.45);cursor:pointer;z-index:19}
+/* ---- comunes ---- */
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:14px;margin-bottom:12px}
+.titulo-sec{font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin:18px 4px 8px;display:flex;justify-content:space-between;align-items:center}
+.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:600;cursor:pointer;background:var(--pri);color:#fff;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.sec{background:var(--pri2);color:var(--pri)}
+.btn.gris{background:#f1f5f9;color:var(--txt)}
+.btn.ok{background:var(--ok)}
+.btn.bad{background:var(--badbg);color:var(--bad)}
+.btn.chico{padding:7px 10px;font-size:13px;border-radius:10px}
+.btn.full{width:100%}
+.fila-btn{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.fila-btn .btn{flex:1;min-width:130px}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:3px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.bad{background:var(--badbg);color:var(--bad)}
+.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.gris{background:#f1f5f9;color:var(--sub)}
+.chip.pri{background:var(--pri2);color:var(--pri)}
+.sub{color:var(--sub);font-size:13px}
+.vacio{text-align:center;color:var(--sub);padding:26px 10px}
+.monto{font-weight:700;font-variant-numeric:tabular-nums}
+.rojo{color:var(--bad)}.verde{color:var(--ok)}
+/* ---- calendario ---- */
+.cal-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cal-top h2{flex:1;margin:0;font-size:19px;text-transform:capitalize}
+.cal-top button{border:0;background:#fff;box-shadow:var(--sh);border-radius:10px;width:36px;height:36px;font-size:18px;cursor:pointer}
+.cal-top .hoy{width:auto;padding:0 12px;font-size:13px;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{text-align:center;font-size:11px;font-weight:700;color:var(--sub);padding:4px 0}
+.dia{aspect-ratio:1/1.05;background:#fff;border-radius:10px;padding:4px;display:flex;flex-direction:column;align-items:center;cursor:pointer;border:2px solid transparent;min-width:0}
+.dia .n{font-size:13px;font-weight:600}
+.dia.hoyd .n{background:var(--pri);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.dia.sel{border-color:var(--pri)}
+.dia.vacio-d{background:transparent;cursor:default}
+.puntos{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;margin-top:auto;padding-bottom:2px}
+.punto{width:7px;height:7px;border-radius:50%}
+.punto.prop{background:transparent!important;border:1.5px dashed var(--sub)}
+.leyenda{display:flex;flex-wrap:wrap;gap:6px 12px;margin:12px 2px 0;font-size:12px;color:var(--sub)}
+.leyenda span{display:flex;align-items:center;gap:5px}
+.filtros{display:flex;gap:6px;overflow-x:auto;margin:16px 0 10px;padding-bottom:2px}
+.filtros button{border:1px solid var(--line);background:#fff;border-radius:20px;padding:6px 12px;font-size:13px;white-space:nowrap;cursor:pointer}
+.filtros button.act{background:var(--txt);color:#fff;border-color:var(--txt)}
+.evento{display:flex;gap:12px;align-items:stretch;cursor:pointer}
+.evento .barra{width:5px;border-radius:4px;flex-shrink:0}
+.evento .fecha-box{width:46px;text-align:center;flex-shrink:0}
+.evento .fecha-box b{display:block;font-size:20px;line-height:1.1}
+.evento .fecha-box small{font-size:11px;color:var(--sub);text-transform:uppercase}
+.evento .info{flex:1;min-width:0}
+.evento .info h3{margin:0 0 3px;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.evento.rechazado{opacity:.55}
+/* ---- modal ---- */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.45);display:flex;align-items:flex-end;justify-content:center;animation:fade .15s}
+.hoja{background:var(--bg);width:100%;max-width:640px;max-height:94vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;animation:sube .2s}
+.hoja-top{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;border-bottom:1px solid var(--line);background:#fff;border-radius:22px 22px 0 0}
+.hoja-top h2{flex:1;margin:0;font-size:17px}
+.cerrar{border:0;background:#f1f5f9;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer}
+.hoja-body{overflow-y:auto;padding:14px 14px calc(env(safe-area-inset-bottom) + 24px)}
+@media(min-width:700px){.modal{align-items:center}.hoja{border-radius:22px}}
+@keyframes fade{from{opacity:0}}@keyframes sube{from{transform:translateY(40px);opacity:.6}}
+/* ---- formularios ---- */
+label.campo{display:block;margin-bottom:12px}
+label.campo>span{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#334155}
+input[type=text],input[type=email],input[type=number],input[type=date],input[type=time],input[type=tel],select,textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--pri)}
+textarea{min-height:80px;resize:vertical}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opciones{display:flex;gap:6px;flex-wrap:wrap}
+.opciones label{flex:1;min-width:90px}
+.opciones input{display:none}
+.opciones label span{display:block;text-align:center;border:1.5px solid var(--line);border-radius:12px;padding:9px 6px;font-size:13px;font-weight:600;cursor:pointer;background:#fff}
+.opciones input:checked+span{border-color:var(--pri);background:var(--pri2);color:var(--pri)}
+.lista-check{max-height:240px;overflow:auto;border:1.5px solid var(--line);border-radius:12px;background:#fff}
+.lista-check label{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.lista-check label:last-child{border-bottom:0}
+.lista-check input{width:18px;height:18px;accent-color:var(--pri)}
+.aviso{background:var(--pri2);color:#3730a3;border-radius:12px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+.aviso.amarillo{background:var(--warnbg);color:var(--warn)}
+/* ---- ficha ---- */
+.ficha-head{border-radius:var(--r);padding:16px;color:#fff;margin-bottom:12px}
+.ficha-head h2{margin:6px 0 4px;font-size:21px}
+.ficha-head .chip{background:rgba(255,255,255,.22);color:#fff}
+.ficha-head p{margin:4px 0;opacity:.95;font-size:14px}
+.tabla{width:100%;border-collapse:collapse;font-size:14px}
+.tabla td{padding:9px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tabla tr:last-child td{border-bottom:0}
+.tabla td.der{text-align:right;white-space:nowrap}
+.tabla tr.clic{cursor:pointer}
+.barra-prog{height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden;margin:8px 0 4px}
+.barra-prog i{display:block;height:100%;background:var(--ok);border-radius:6px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:#fff;border-radius:14px;padding:10px;box-shadow:var(--sh);text-align:center}
+.kpi small{display:block;font-size:11px;color:var(--sub);margin-bottom:3px}
+.kpi b{font-size:16px}
+.renglon{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.renglon:last-child{border-bottom:0}
+.renglon.total{font-weight:800;font-size:16px;border-top:2px solid var(--txt);border-bottom:0;margin-top:4px;padding-top:10px}
+.galeria{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.galeria img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;cursor:pointer;background:#e2e8f0}
+.item{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .cuerpo{flex:1;min-width:0}
+.mini{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#e2e8f0;cursor:pointer;flex-shrink:0}
+.banco{background:linear-gradient(135deg,#1e1b4b,#4f46e5);color:#fff;border-radius:16px;padding:16px;margin-bottom:14px}
+.banco .dato{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.15)}
+.banco .dato:last-child{border-bottom:0}
+.banco small{opacity:.75;font-size:11px;display:block}
+.banco b{font-size:15px;letter-spacing:.03em;word-break:break-all}
+.banco button{border:0;background:rgba(255,255,255,.18);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;flex-shrink:0}
+.grande{font-size:32px;font-weight:800;margin:4px 0}
+input.buscar{margin-bottom:10px}
+/* ---- toast/loader ---- */
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 90px);transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;z-index:100;max-width:90vw;box-shadow:var(--sh);transition:opacity .2s}
+#toast.err{background:var(--bad)}
+#loader{position:fixed;inset:0;z-index:90;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center}
+#loader img{width:min(320px,78vw);border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+#splash{position:fixed;inset:0;z-index:200;background:#0154a3;display:flex;align-items:center;justify-content:center;transition:opacity .35s}
+#splash img{width:min(520px,92vw)}
+#splash.fuera{opacity:0;pointer-events:none}
+.spin{width:42px;height:42px;border:4px solid var(--pri2);border-top-color:var(--pri);border-radius:50%;animation:gira .8s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login" class="oculto">
+  <div class="login-card">
+    <div class="logo">📅</div>
+    <h1 id="loginTitulo">Calendario del Grupo</h1>
+    <p>Eventos, cuotas y fondos del grupo en un solo lugar</p>
+    <div id="gbtn"></div>
+    <div class="sep" id="sepGoogle">o entra con un código a tu correo</div>
+    <div id="pasoCorreo">
+      <label class="campo"><input type="email" id="lgEmail" placeholder="tu@correo.com" autocomplete="email"></label>
+      <button class="btn full" onclick="pedirCodigo()">Enviarme código</button>
+    </div>
+    <div id="pasoCodigo" class="oculto">
+      <p style="margin-bottom:10px">Revisa tu correo y escribe el código de 6 dígitos</p>
+      <label class="campo"><input type="tel" id="lgCodigo" maxlength="6" placeholder="000000" style="text-align:center;font-size:22px;letter-spacing:8px"></label>
+      <label class="campo"><input type="text" id="lgNombre" placeholder="Tu nombre (solo la primera vez)"></label>
+      <button class="btn full" onclick="entrarCodigo()">Entrar</button>
+      <button class="btn gris full" style="margin-top:8px" onclick="volverCorreo()">Cambiar correo</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" class="oculto">
+  <header>
+    <h1 id="hdrTitulo">Calendario del Grupo</h1>
+    <button class="avatar" id="hdrAvatar" onclick="abrirPerfil()">?</button>
+  </header>
+  <main id="vista"></main>
+  <button class="fab" id="fab" onclick="formEvento()">＋</button>
+  <nav>
+    <button data-tab="cal" onclick="irTab('cal')"><span class="ic">📅</span>Calendario</button>
+    <button data-tab="cuentas" onclick="irTab('cuentas')"><span class="ic">💰</span>Cuentas</button>
+    <button data-tab="fondo" onclick="irTab('fondo')"><span class="ic">🏦</span>Fondo</button>
+    <button data-tab="admin" id="navAdmin" class="oculto" onclick="irTab('admin')"><span class="ic">⚙️</span>Admin<span class="badge oculto" id="badgeAdmin"></span></button>
+  </nav>
+</section>
+
+<div id="modales"></div>
+<div id="toast" class="oculto"></div>
+<div id="loader" class="oculto"><img src="cargando.svg" alt="Cargando…"></div>
+<div id="splash"><img id="splashImg" alt="Cargando…"></div>
+<script>(function(){var n=0;try{n=+localStorage.getItem('cg_splash')||0;localStorage.setItem('cg_splash',(n+1)%2)}catch(e){}
+document.getElementById('splashImg').src=n%2?'cargando-letras.svg':'cargando-caida.svg';})();</script>
+
+<script>
+/* ==================== CONFIGURACIÓN ==================== */
+const API_URL = 'https://script.google.com/macros/s/AKfycby0BxBIpoxLCc5W1axMRuHKH82TyyyEGbE-2AdaNt1Z8ExmiYtjc4TKdNSFGTMcKV7WLg/exec';
+
+const COLORES = {'Tarea grupal':'#2563eb','Festejo':'#db2777','Participación':'#16a34a','Evento obligatorio':'#dc2626','Reunión':'#7c3aed','Otro':'#64748b'};
+const ICONOS  = {'Tarea grupal':'🧹','Festejo':'🎉','Participación':'🙋','Evento obligatorio':'❗','Reunión':'🗣️','Otro':'📌'};
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const MES3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DSEM = ['dom','lun','mar','mié','jue','vie','sáb'];
+
+/* ==================== ESTADO ==================== */
+const ls = {
+  get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},
+  set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},
+  del:k=>{try{localStorage.removeItem(k)}catch(e){}}
+};
+let TOKEN = ls.get('cg_token');
+let D = null;
+let tab = 'cal';
+let mesVista = new Date(); mesVista.setDate(1);
+let diaSel = null;
+let filtroLista = 'proximos';
+let filtroCuentas = '';
+let correoLogin = '';
+
+/* ==================== UTILIDADES ==================== */
+const $ = s => document.querySelector(s);
+const jsq = s => esc(String(s ?? '').replace(/['"\\`]/g,''));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(Number(n)||0);
+const r2 = n => Math.round((Number(n)||0)*100)/100;
+const color = t => COLORES[t] || COLORES.Otro;
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const hoy = () => ymd(new Date());
+const fdate = f => new Date(f+'T12:00:00');
+const fechaLarga = f => { if(!f) return ''; const d=fdate(f); return DSEM[d.getDay()]+' '+d.getDate()+' de '+MESES[d.getMonth()]+' '+d.getFullYear(); };
+const thumb = (id,w=800) => 'https://drive.google.com/thumbnail?id='+id+'&sz=w'+w;
+const iniciales = n => String(n||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
+const persona = id => (D.personas.find(p=>p.id===id) || {nombre:'—'});
+const evento = id => D.eventos.find(e=>e.id===id);
+const yoAdmin = () => D && D.yo.admin;
+
+function toast(msg, err){
+  const t=$('#toast'); t.textContent=msg; t.className=err?'err':''; 
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.add('oculto'), err?4500:2600);
+}
+function cargando(on){ $('#loader').classList.toggle('oculto',!on); }
+
+async function api(accion, datos){
+  const r = await fetch(API_URL,{method:'POST',body:JSON.stringify({accion,token:TOKEN,datos:datos||{}})});
+  const j = await r.json();
+  if(!j.ok){
+    if(j.error==='SESION'){ ls.del('cg_token'); TOKEN=null; setTimeout(()=>location.reload(),1500); throw new Error('Tu sesión terminó, vuelve a entrar'); }
+    throw new Error(j.error);
+  }
+  return j.data;
+}
+async function correr(fn, ok){
+  cargando(true);
+  try{ const r = await fn(); if(ok) toast(ok); return r; }
+  catch(e){ toast(e.message||'Ocurrió un error',true); throw e; }
+  finally{ cargando(false); }
+}
+async function recargar(){
+  D = await api('datos');
+  pintar();
+  refrescarModales();
+}
+async function accion(nombre, datos, ok, cerrar=true){
+  await correr(async()=>{ await api(nombre,datos); if(cerrar) cerrarModal(); await recargar(); }, ok);
+}
+function copiar(txt){
+  const fin=()=>toast('Copiado ✓');
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(fin).catch(()=>viejo());
+  else viejo();
+  function viejo(){ const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t); t.select(); try{document.execCommand('copy');fin()}catch(e){} t.remove(); }
+}
+
+function leerArchivo(file){
+  return new Promise((res,rej)=>{
+    if(!file) return res(null);
+    if(file.type.startsWith('image/')){
+      const img=new Image(), url=URL.createObjectURL(file);
+      img.onload=()=>{
+        const max=1600, k=Math.min(1,max/Math.max(img.width,img.height));
+        const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+        res({nombre:(file.name||'foto').replace(/\.\w+$/,'')+'.jpg',tipo:'image/jpeg',base64:c.toDataURL('image/jpeg',.8).split(',')[1]});
+      };
+      img.onerror=()=>rej(new Error('No se pudo leer la imagen'));
+      img.src=url;
+    } else {
+      if(file.size>6e6) return rej(new Error('El archivo pesa más de 6 MB'));
+      const fr=new FileReader();
+      fr.onload=()=>res({nombre:file.name,tipo:file.type||'application/pdf',base64:String(fr.result).split(',')[1]});
+      fr.onerror=()=>rej(new Error('No se pudo leer el archivo'));
+      fr.readAsDataURL(file);
+    }
+  });
+}
+
+/* ==================== MODALES ==================== */
+const pilaModales = [];
+function abrirModal(titulo, render){
+  const m=document.createElement('div'); m.className='modal';
+  m.innerHTML='<div class="hoja"><div class="hoja-top"><h2></h2><button class="cerrar" onclick="cerrarModal()">✕</button></div><div class="hoja-body"></div></div>';
+  m.addEventListener('click',e=>{ if(e.target===m) cerrarModal(); });
+  $('#modales').appendChild(m);
+  const obj={el:m, titulo, render};
+  pilaModales.push(obj);
+  pintarModal(obj);
+  document.body.style.overflow='hidden';
+  return obj;
+}
+function pintarModal(o){
+  const r = typeof o.render==='function' ? o.render() : o.render;
+  if(r===null){ cerrarModal(o); return; }
+  o.el.querySelector('h2').textContent = typeof o.titulo==='function'? o.titulo() : o.titulo;
+  const body=o.el.querySelector('.hoja-body'), y=body.scrollTop;
+  body.innerHTML=r; body.scrollTop=y;
+}
+function cerrarModal(o){
+  const m = o || pilaModales[pilaModales.length-1]; if(!m) return;
+  pilaModales.splice(pilaModales.indexOf(m),1); m.el.remove();
+  if(!pilaModales.length) document.body.style.overflow='';
+}
+function refrescarModales(){ pilaModales.filter(m=>m.vivo).forEach(pintarModal); }
+function verArchivo(id){
+  abrirModal('Archivo', `<img src="${thumb(id,1600)}" style="width:100%;border-radius:12px;background:#e2e8f0" alt="">
+    <a class="btn sec full" style="margin-top:12px;text-decoration:none" target="_blank" href="https://drive.google.com/file/d/${id}/view">Abrir original</a>`);
+}
+
+/* ==================== INICIO / LOGIN ==================== */
+function quitarSplash(){ const s=$('#splash'); if(!s) return; s.classList.add('fuera'); setTimeout(()=>s.remove(),400); }
+async function iniciar(){
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  const minimo = new Promise(r=>setTimeout(r,3200));
+  if(TOKEN){
+    try{ await recargar(); await minimo; mostrarApp(); quitarSplash(); return; }
+    catch(e){}
+  }
+  await minimo; quitarSplash();
+  mostrarLogin();
+}
+async function mostrarLogin(){
+  $('#app').classList.add('oculto'); $('#login').classList.remove('oculto');
+  try{
+    const inf = await api('info');
+    $('#loginTitulo').textContent = inf.nombre; document.title = inf.nombre;
+    if(inf.clientId && !/^PEGA/.test(inf.clientId)) cargarGoogle(inf.clientId);
+    else { $('#gbtn').classList.add('oculto'); $('#sepGoogle').textContent='Entra con un código a tu correo'; }
+  }catch(e){ toast('No se pudo conectar con el servidor. Revisa API_URL.',true); }
+}
+function cargarGoogle(cid){
+  const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true;
+  s.onload=()=>{
+    google.accounts.id.initialize({client_id:cid, callback:r=>entrar('loginGoogle',{credential:r.credential})});
+    google.accounts.id.renderButton($('#gbtn'),{theme:'filled_blue',size:'large',shape:'pill',text:'continue_with',locale:'es',width:280});
+  };
+  document.head.appendChild(s);
+}
+async function entrar(acc, datos){
+  const r = await correr(()=>api(acc,datos));
+  TOKEN=r.token; ls.set('cg_token',TOKEN);
+  await correr(recargar); mostrarApp();
+}
+async function pedirCodigo(){
+  const e=$('#lgEmail').value.trim(); if(!e) return toast('Escribe tu correo',true);
+  await correr(()=>api('pedirCodigo',{email:e}),'Código enviado a '+e);
+  correoLogin=e; $('#pasoCorreo').classList.add('oculto'); $('#pasoCodigo').classList.remove('oculto'); $('#lgCodigo').focus();
+}
+function volverCorreo(){ $('#pasoCodigo').classList.add('oculto'); $('#pasoCorreo').classList.remove('oculto'); }
+function entrarCodigo(){ entrar('loginCodigo',{email:correoLogin,codigo:$('#lgCodigo').value,nombre:$('#lgNombre').value.trim()}); }
+
+function mostrarApp(){
+  $('#login').classList.add('oculto'); $('#app').classList.remove('oculto');
+}
+function abrirPerfil(){
+  abrirModal('Mi perfil', ()=>`
+    <div class="card" style="text-align:center">
+      <div class="avatar" style="width:60px;height:60px;font-size:22px;background:var(--pri2);color:var(--pri);display:inline-flex;align-items:center;justify-content:center">${esc(iniciales(D.yo.nombre))}</div>
+      <h3 style="margin:8px 0 2px">${esc(D.yo.nombre)}</h3>
+      <div class="sub">${esc(D.yo.email)}</div>
+      ${D.yo.admin?'<div class="chip pri" style="margin-top:8px">Administrador</div>':''}
+    </div>
+    <label class="campo"><span>Cambiar mi nombre</span><input type="text" id="pfNombre" value="${esc(D.yo.nombre)}"></label>
+    <button class="btn full" onclick="accion('actualizarMiNombre',{nombre:$('#pfNombre').value},'Nombre actualizado')">Guardar nombre</button>
+    <button class="btn bad full" style="margin-top:10px" onclick="salir()">Cerrar sesión</button>`);
+}
+async function salir(){
+  try{ await api('cerrarSesion',{token:TOKEN}); }catch(e){}
+  ls.del('cg_token'); TOKEN=null; location.reload();
+}
+
+/* ==================== PINTADO GENERAL ==================== */
+function irTab(t){ tab=t; window.scrollTo(0,0); pintar(); }
+function pintar(){
+  if(!D) return;
+  $('#hdrAvatar').textContent = iniciales(D.yo.nombre);
+  $('#navAdmin').classList.toggle('oculto',!D.yo.admin);
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.tab===tab));
+  if(D.yo.admin){
+    const n = D.pendientes.pagos.length + D.pendientes.propuestas.length;
+    const b=$('#badgeAdmin'); b.textContent=n; b.classList.toggle('oculto',!n);
+  }
+  $('#fab').classList.toggle('oculto', tab!=='cal');
+  const v = {cal:vistaCalendario, cuentas:vistaCuentas, fondo:vistaFondo, admin:vistaAdmin}[tab];
+  $('#vista').innerHTML = v ? v() : '';
+  $('#hdrTitulo').textContent = {cal:'Calendario',cuentas:'Cuentas',fondo:'Fondo grupal',admin:'Administración'}[tab];
+}
+
+/* ==================== CALENDARIO ==================== */
+function miCuenta(ev){ return ev.cuentas.find(c=>c.personaId===D.yo.id); }
+function chipPago(c){
+  if(!c || (c.cuota===0 && c.pagado===0 && c.revision===0)) return '';
+  let h='';
+  if(c.saldo>0.009) h+=`<span class="chip bad">Debe ${fmt(c.saldo)}</span>`;
+  else if(c.saldo<-0.009) h+=`<span class="chip ok">A favor ${fmt(-c.saldo)}</span>`;
+  else h+=`<span class="chip ok">Pagado ✓</span>`;
+  if(c.revision>0) h+=` <span class="chip warn">En revisión ${fmt(c.revision)}</span>`;
+  return h;
+}
+function chipEstadoEvento(ev){
+  if(ev.estado==='propuesto') return '<span class="chip warn">Propuesta · por aprobar</span>';
+  if(ev.estado==='rechazado') return '<span class="chip gris">Propuesta rechazada</span>';
+  return '';
+}
+function tarjetaEvento(ev){
+  const d=fdate(ev.fecha), c=miCuenta(ev);
+  return `<div class="card evento ${ev.estado==='rechazado'?'rechazado':''}" onclick="abrirEvento('${ev.id}')">
+    <div class="barra" style="background:${color(ev.tipo)}"></div>
+    <div class="fecha-box"><small>${DSEM[d.getDay()]}</small><b>${d.getDate()}</b><small>${MES3[d.getMonth()]}</small></div>
+    <div class="info">
+      <h3>${ICONOS[ev.tipo]||''} ${esc(ev.titulo)}</h3>
+      <div class="sub">${esc(ev.tipo)}${ev.hora?' · '+esc(ev.hora):''}${ev.lugar?' · '+esc(ev.lugar):''}</div>
+      <div class="chips">${chipEstadoEvento(ev)}${ev.cuotaPP?`<span class="chip pri">Cuota ${fmt(ev.cuotaPP)}</span>`:''}${chipPago(c)}</div>
+    </div></div>`;
+}
+function vistaCalendario(){
+  const y=mesVista.getFullYear(), m=mesVista.getMonth();
+  const offset=(new Date(y,m,1).getDay()+6)%7, dias=new Date(y,m+1,0).getDate(), h=hoy();
+  const porDia={}; D.eventos.forEach(e=>{ (porDia[e.fecha]=porDia[e.fecha]||[]).push(e); });
+  let g='LMMJVSD'.split('').map(x=>`<div class="dow">${x}</div>`).join('');
+  for(let i=0;i<offset;i++) g+='<div class="dia vacio-d"></div>';
+  for(let d=1; d<=dias; d++){
+    const f=y+'-'+pad(m+1)+'-'+pad(d), evs=porDia[f]||[];
+    g+=`<div class="dia ${f===h?'hoyd':''} ${f===diaSel?'sel':''}" onclick="selDia('${f}')"><span class="n">${d}</span>
+      <div class="puntos">${evs.slice(0,4).map(e=>`<i class="punto ${e.estado!=='aprobado'?'prop':''}" style="background:${color(e.tipo)}"></i>`).join('')}</div></div>`;
+  }
+  let lista, tituloLista;
+  if(diaSel){
+    lista=(porDia[diaSel]||[]); tituloLista=fechaLarga(diaSel);
+  } else if(filtroLista==='pasados'){
+    lista=D.eventos.filter(e=>e.fecha<h && e.estado==='aprobado').reverse(); tituloLista='Eventos pasados';
+  } else if(filtroLista==='mios'){
+    lista=D.eventos.filter(e=>e.creadoPor===D.yo.id && e.estado!=='aprobado'); tituloLista='Mis propuestas';
+  } else if(filtroLista==='debo'){
+    lista=D.eventos.filter(e=>{const c=miCuenta(e); return e.estado==='aprobado' && c && c.saldo>0.009}); tituloLista='Con pago pendiente';
+  } else {
+    lista=D.eventos.filter(e=>e.fecha>=h && e.estado!=='rechazado'); tituloLista='Próximos eventos';
+  }
+  const f=(k,t)=>`<button class="${!diaSel&&filtroLista===k?'act':''}" onclick="filtroLista='${k}';diaSel=null;pintar()">${t}</button>`;
+  return `<div class="cal-top">
+      <button onclick="moverMes(-1)">‹</button><h2>${MESES[m]} ${y}</h2>
+      <button class="hoy" onclick="mesVista=new Date();mesVista.setDate(1);diaSel=hoy();pintar()">Hoy</button>
+      <button onclick="moverMes(1)">›</button></div>
+    <div class="grid">${g}</div>
+    <div class="leyenda">${Object.keys(COLORES).map(t=>`<span><i class="punto" style="background:${COLORES[t]}"></i>${t}</span>`).join('')}<span><i class="punto prop"></i>Propuesta</span></div>
+    <div class="filtros">${f('proximos','Próximos')}${f('debo','Debo')}${f('pasados','Pasados')}${f('mios','Mis propuestas')}</div>
+    <div class="titulo-sec"><span>${esc(tituloLista)}</span>${diaSel?`<button class="btn chico gris" onclick="diaSel=null;pintar()">Ver todos</button>`:''}</div>
+    ${lista.length? lista.map(tarjetaEvento).join('') : `<div class="vacio">Sin eventos${diaSel?` este día.<br><br><button class="btn sec" onclick="formEvento(null,'${diaSel}')">${yoAdmin()?'Crear evento':'Proponer fecha'} aquí</button>`:''}</div>`}`;
+}
+function moverMes(n){ mesVista.setMonth(mesVista.getMonth()+n); diaSel=null; pintar(); }
+function selDia(f){ diaSel = diaSel===f? null : f; pintar(); }
+
+/* ==================== FICHA DE EVENTO ==================== */
+function abrirEvento(id){
+  const m = abrirModal(()=> (evento(id)||{}).titulo||'Evento', ()=> evento(id) ? fichaEvento(evento(id)) : null);
+  m.vivo = true;
+}
+function fichaEvento(ev){
+  const adm=yoAdmin(), c=miCuenta(ev), esMio=ev.creadoPor===D.yo.id, fin=ev.finanzas;
+  const yoP=persona(D.yo.id);
+  let h=`<div class="ficha-head" style="background:linear-gradient(135deg,${color(ev.tipo)},${color(ev.tipo)}cc)">
+    <span class="chip">${ICONOS[ev.tipo]||''} ${esc(ev.tipo)}</span>
+    <h2>${esc(ev.titulo)}</h2>
+    <p>📆 ${fechaLarga(ev.fecha)}${ev.hora?' · '+esc(ev.hora)+' h':''}</p>
+    ${ev.lugar?`<p>📍 ${esc(ev.lugar)}</p>`:''}
+    <p style="font-size:12px;opacity:.8">${ev.aplicaTodos?'Aplica para todos':ev.participantes.length+' participantes'} · creado por ${esc(ev.creadorNombre)}</p>
+  </div>`;
+  if(ev.estado==='propuesto') h+=`<div class="aviso amarillo">Esta fecha es una <b>propuesta</b>. Solo ${adm?'tú (admin) y quien la propuso la ven':'tú la ves'} hasta que el administrador la apruebe.</div>`;
+  if(ev.estado==='rechazado') h+=`<div class="aviso amarillo">El administrador no aprobó esta propuesta. Puedes editarla y volver a enviarla.</div>`;
+  if(ev.descripcion) h+=`<div class="card" style="white-space:pre-wrap">${esc(ev.descripcion)}</div>`;
+
+  // Acciones del evento
+  const acc=[];
+  if(adm && ev.estado==='propuesto'){ acc.push(`<button class="btn ok" onclick="accion('revisarEvento',{id:'${ev.id}',aprobar:true},'Evento aprobado y visible para todos',false)">✓ Aprobar</button>`);
+    acc.push(`<button class="btn bad" onclick="accion('revisarEvento',{id:'${ev.id}',aprobar:false},'Propuesta rechazada',false)">Rechazar</button>`); }
+  if(adm || (esMio && ev.estado!=='aprobado')){
+    acc.push(`<button class="btn gris" onclick="formEvento('${ev.id}')">✏️ Editar</button>`);
+    acc.push(`<button class="btn bad" onclick="borrarEvento('${ev.id}')">🗑 Borrar</button>`);
+  }
+  if(acc.length) h+=`<div class="fila-btn" style="margin:0 0 12px">${acc.join('')}</div>`;
+
+  if(ev.estado!=='aprobado') return h + resumenCuotaTexto(ev);
+
+  // ---- Cuota ----
+  if(ev.modoCuota!=='ninguna' || ev.pagos.length){
+    const pct = ev.totalEsperado? Math.min(100, fin.recaudado/ev.totalEsperado*100) : 0;
+    h+=`<div class="titulo-sec"><span>Cuota</span></div><div class="card">
+      ${resumenCuotaTexto(ev,true)}
+      ${ev.totalEsperado?`<div class="barra-prog"><i style="width:${pct}%"></i></div>
+      <div class="sub">Recaudado ${fmt(fin.recaudado)} de ${fmt(ev.totalEsperado)}</div>`:''}</div>`;
+
+    if(c && (c.cuota>0 || c.pagado!==0 || c.revision>0)){
+      h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="sub">Mi estado</div><div class="grande ${c.saldo>0.009?'rojo':'verde'}">${c.saldo>0.009?'−'+fmt(c.saldo):(c.saldo<-0.009?'+'+fmt(-c.saldo):'Pagado ✓')}</div></div>
+        <div style="text-align:right" class="sub">Cuota ${fmt(c.cuota)}<br>Pagado ${fmt(c.pagado)}${c.revision?`<br><span style="color:var(--warn)">En revisión ${fmt(c.revision)}</span>`:''}</div></div>
+        <div class="fila-btn">
+          ${c.saldo>0.009?`<button class="btn" onclick="formPago('${ev.id}',${r2(c.saldo-c.revision)>0?r2(c.saldo-c.revision):c.saldo})">💸 Mandar transferencia</button>`:''}
+          ${c.saldo>0.009 && yoP.saldoFavor>0.009?`<button class="btn sec" onclick="formTraspaso('${D.yo.id}','SALDO','${ev.id}')">Usar saldo a favor (${fmt(yoP.saldoFavor)})</button>`:''}
+          ${c.saldo<=0.009?`<button class="btn sec" onclick="formPago('${ev.id}',0)">Abonar más</button>`:''}
+          ${c.saldo<-0.009?`<button class="btn sec" onclick="formTraspaso('${D.yo.id}','${ev.id}','SALDO')">Pasar excedente a saldo a favor</button>`:''}
+        </div></div>`;
+    }
+
+    h+=`<div class="titulo-sec"><span>Participantes (${ev.cuentas.filter(x=>x.participa).length})</span>${adm?`<button class="btn chico sec" onclick="formPagoAdmin('${ev.id}')">+ Registrar pago</button>`:''}</div>
+      <div class="card" style="padding:4px 12px"><table class="tabla">${ev.cuentas.map(x=>`
+        <tr class="${adm?'clic':''}" ${adm?`onclick="accionesPersonaEvento('${ev.id}','${x.personaId}')"`:''}>
+          <td><b>${esc(x.nombre)}</b>${!x.participa?' <span class="chip gris">no participa</span>':''}<div class="sub">Cuota ${fmt(x.cuota)} · pagado ${fmt(x.pagado)}</div></td>
+          <td class="der">${chipPago(x)||'<span class="chip gris">Sin cuota</span>'}</td></tr>`).join('')}</table></div>`;
+
+    if(ev.pagos.length){
+      h+=`<div class="titulo-sec"><span>Historial de pagos</span></div><div class="card" style="padding:4px 12px">${ev.pagos.map(p=>itemPago(p,true)).join('')}</div>`;
+    }
+  } else {
+    h+=`<div class="card sub">Este evento no tiene cuota.${adm?' Edítalo si necesitas asignar una.':''}</div>`;
+  }
+
+  // ---- Gastos ----
+  if(ev.gastos.length || adm){
+    h+=`<div class="titulo-sec"><span>Gastos</span>${adm?`<button class="btn chico sec" onclick="formGasto('${ev.id}')">+ Gasto</button>`:''}</div><div class="card" style="padding:4px 12px">
+      ${ev.gastos.length? ev.gastos.map(g=>`<div class="item">
+        ${g.archivoId?`<img class="mini" src="${thumb(g.archivoId,200)}" onclick="verArchivo('${g.archivoId}')" alt="">`:'<div class="mini" style="display:flex;align-items:center;justify-content:center">🧾</div>'}
+        <div class="cuerpo"><b>${esc(g.concepto)}</b><div class="sub">${esc(g.fecha)}</div></div>
+        <span class="monto">${fmt(g.monto)}</span>
+        ${adm?`<button class="btn chico gris" onclick="formGasto('${ev.id}','${g.id}')">✏️</button>`:''}</div>`).join('') : '<div class="vacio">Sin gastos registrados</div>'}
+    </div>`;
+  }
+
+  // ---- Resumen ----
+  if(ev.pagos.length || ev.gastos.length || fin.aportesFondo || fin.enviadoFondo){
+    const res=fin.resultado;
+    h+=`<div class="titulo-sec"><span>Resumen del evento</span></div><div class="card">
+      <div class="renglon"><span>Recaudado (pagos validados)</span><span class="monto">${fmt(fin.recaudado)}</span></div>
+      ${fin.aportesFondo?`<div class="renglon"><span>Aportado por el fondo grupal</span><span class="monto">+ ${fmt(fin.aportesFondo)}</span></div>`:''}
+      <div class="renglon"><span>Gastos</span><span class="monto rojo">− ${fmt(fin.gastos)}</span></div>
+      ${fin.enviadoFondo?`<div class="renglon"><span>Enviado al fondo grupal</span><span class="monto">− ${fmt(fin.enviadoFondo)}</span></div>`:''}
+      <div class="renglon total"><span>${res>0.009?'Sobró':res<-0.009?'Faltó':'Cuadrado'}</span><span class="${res<-0.009?'rojo':'verde'}">${fmt(Math.abs(res))}</span></div>
+      ${adm?`<div class="fila-btn">
+        ${res>0.009?`<button class="btn ok" onclick="formFondo('ingreso','${ev.id}',${res},'Sobrante de ${jsq(ev.titulo)}')">Enviar sobrante al fondo</button>`:''}
+        ${res<-0.009?`<button class="btn" onclick="formFondo('egreso','${ev.id}',${-res},'Faltante de ${jsq(ev.titulo)}')">Cubrir faltante con fondo</button>`:''}
+        ${res>=-0.009?`<button class="btn sec" onclick="formFondo('egreso','${ev.id}',0,'Apoyo a ${jsq(ev.titulo)}')">Asignar dinero del fondo</button>`:''}
+      </div>`:''}</div>`;
+  }
+
+  // ---- Fotos ----
+  if(ev.fotos.length || adm){
+    h+=`<div class="titulo-sec"><span>Fotos y evidencias</span>${adm?`<label class="btn chico sec">+ Fotos<input type="file" accept="image/*" multiple class="oculto" onchange="subirFotos('${ev.id}',this)"></label>`:''}</div>
+      ${ev.fotos.length?`<div class="galeria">${ev.fotos.map(f=>`<img src="${thumb(f.archivoId,400)}" loading="lazy" onclick="${adm?`opcionesFoto('${f.id}','${f.archivoId}')`:`verArchivo('${f.archivoId}')`}" alt="">`).join('')}</div>`:'<div class="card vacio">Aún no hay fotos</div>'}`;
+  }
+  return h;
+}
+function resumenCuotaTexto(ev, sinCard){
+  let t='';
+  const n=ev.participantes.length;
+  if(ev.modoCuota==='porPersona') t=`<b>${fmt(ev.montoPorPersona)}</b> por persona · ${n} participantes · total esperado ${fmt(ev.totalEsperado)}`;
+  else if(ev.modoCuota==='total') t=`Total <b>${fmt(ev.montoTotal)}</b> ÷ ${n} participantes = <b>${fmt(ev.cuotaPP)}</b> c/u`;
+  else t='Sin cuota';
+  return sinCard? `<div>${t}</div>` : `<div class="card"><div class="sub">Cuota propuesta</div>${t}</div>`;
+}
+function itemPago(p, conNombre){
+  const est = {validado:'<span class="chip ok">Validado</span>',pendiente:'<span class="chip warn">Por validar</span>',rechazado:'<span class="chip bad">Rechazado</span>'}[p.estado]||'';
+  const tipo = {transferencia:'Transferencia',efectivo:'Efectivo',traspaso:'Traspaso'}[p.tipo]||p.tipo;
+  const adm=yoAdmin(), mio=p.personaId===D.yo.id;
+  return `<div class="item">
+    ${p.archivoId?`<img class="mini" src="${thumb(p.archivoId,200)}" onclick="verArchivo('${p.archivoId}')" alt="">`:`<div class="mini" style="display:flex;align-items:center;justify-content:center">${p.tipo==='efectivo'?'💵':p.tipo==='traspaso'?'🔁':'🏦'}</div>`}
+    <div class="cuerpo">${conNombre?`<b>${esc(p.nombre)}</b> · `:''}<span class="sub">${tipo} · ${esc(p.fecha)}</span>
+      ${p.nota?`<div class="sub">${esc(p.nota)}</div>`:''}<div style="margin-top:3px">${est}</div>
+      ${adm&&p.estado==='pendiente'?`<div class="fila-btn" style="margin-top:6px"><button class="btn chico ok" onclick="accion('revisarPago',{id:'${p.id}',aprobar:true},'Pago validado',false)">✓ Validar</button><button class="btn chico bad" onclick="accion('revisarPago',{id:'${p.id}',aprobar:false},'Pago rechazado',false)">Rechazar</button></div>`:''}
+    </div>
+    <div style="text-align:right"><div class="monto ${p.monto<0?'rojo':''}">${fmt(p.monto)}</div>
+      ${(adm || (mio&&p.estado==='pendiente'))?`<button class="btn chico gris" style="margin-top:4px" onclick="borrarPago('${p.id}')">🗑</button>`:''}</div>
+  </div>`;
+}
+function borrarEvento(id){
+  if(!confirm('¿Borrar este evento? Se eliminarán también sus gastos y fotos.')) return;
+  correr(async()=>{ await api('borrarEvento',{id}); cerrarModal(); await recargar(); },'Evento borrado');
+}
+function borrarPago(id){
+  if(!confirm('¿Borrar este movimiento?')) return;
+  accion('borrarPago',{id},'Movimiento borrado',false);
+}
+function accionesPersonaEvento(evId, pid){
+  const ev=evento(evId), c=ev.cuentas.find(x=>x.personaId===pid), p=persona(pid);
+  abrirModal(p.nombre, ()=>`
+    <div class="card"><div class="renglon"><span>Cuota</span><b>${fmt(c.cuota)}</b></div>
+      <div class="renglon"><span>Pagado</span><b>${fmt(c.pagado)}</b></div>
+      <div class="renglon"><span>${c.saldo>0?'Debe':'A favor'}</span><b class="${c.saldo>0?'rojo':'verde'}">${fmt(Math.abs(c.saldo))}</b></div>
+      <div class="renglon"><span>Saldo a favor general</span><b>${fmt(p.saldoFavor)}</b></div></div>
+    <button class="btn full" onclick="cerrarModal();formPagoAdmin('${evId}','${pid}',${Math.max(0,c.saldo)})">💵 Registrar pago</button>
+    ${p.saldoFavor>0 && c.saldo>0?`<button class="btn sec full" style="margin-top:8px" onclick="cerrarModal();formTraspaso('${pid}','SALDO','${evId}')">Aplicar su saldo a favor</button>`:''}
+    ${c.saldo<0?`<button class="btn sec full" style="margin-top:8px" onclick="cerrarModal();formTraspaso('${pid}','${evId}','SALDO')">Pasar excedente a su saldo a favor</button>`:''}
+    <button class="btn gris full" style="margin-top:8px" onclick="cerrarModal();verPersona('${pid}')">Ver estado de cuenta</button>`);
+}
+
+/* ==================== FORMULARIO DE EVENTO ==================== */
+function formEvento(id, fechaPre){
+  const ev = id ? evento(id) : null, adm=yoAdmin();
+  const activos = D.personas.filter(p=>p.activo);
+  const sel = ev ? ev.participantes : [];
+  const v = ev || {titulo:'',tipo:'Festejo',fecha:fechaPre||diaSel||hoy(),hora:'',lugar:'',descripcion:'',aplicaTodos:true,modoCuota:'ninguna',montoTotal:0,montoPorPersona:0};
+  const t = ev ? 'Editar evento' : (adm?'Nuevo evento':'Proponer fecha');
+  abrirModal(t, `
+    ${!adm?'<div class="aviso">Tu propuesta solo la verás tú hasta que el administrador la apruebe; después la verán todos.</div>':''}
+    <form id="fEv" onsubmit="return guardarEvento(event,'${id||''}')">
+      <label class="campo"><span>Nombre del evento</span><input type="text" name="titulo" required value="${esc(v.titulo)}" placeholder="Ej. Concurso de altares"></label>
+      <label class="campo"><span>Tipo</span><select name="tipo">${D.tipos.map(x=>`<option ${x===v.tipo?'selected':''}>${x}</option>`).join('')}</select></label>
+      <div class="dos"><label class="campo"><span>Fecha</span><input type="date" name="fecha" required value="${v.fecha}"></label>
+        <label class="campo"><span>Hora (opcional)</span><input type="time" name="hora" value="${esc(v.hora)}"></label></div>
+      <label class="campo"><span>Lugar (opcional)</span><input type="text" name="lugar" value="${esc(v.lugar)}"></label>
+      <label class="campo"><span>Descripción (opcional)</span><textarea name="descripcion">${esc(v.descripcion)}</textarea></label>
+
+      <label class="campo"><span>¿A quién aplica?</span></label>
+      <div class="opciones" style="margin-top:-6px;margin-bottom:10px">
+        <label><input type="radio" name="aplica" value="todos" ${v.aplicaTodos?'checked':''} onchange="evPrev()"><span>Todos</span></label>
+        <label><input type="radio" name="aplica" value="algunos" ${!v.aplicaTodos?'checked':''} onchange="evPrev()"><span>Solo algunos</span></label>
+      </div>
+      <div id="evPart" class="${v.aplicaTodos?'oculto':''}" style="margin-bottom:12px">
+        <div class="fila-btn" style="margin:0 0 6px"><button type="button" class="btn chico gris" onclick="marcarTodos(true)">Marcar todos</button><button type="button" class="btn chico gris" onclick="marcarTodos(false)">Ninguno</button></div>
+        <div class="lista-check">${activos.map(p=>`<label><input type="checkbox" name="part" value="${p.id}" ${sel.includes(p.id)?'checked':''} onchange="evPrev()"> ${esc(p.nombre)} ${!p.tieneCuenta?'<span class="chip gris">sin cuenta</span>':''}</label>`).join('')}</div>
+      </div>
+
+      <label class="campo"><span>Cuota</span></label>
+      <div class="opciones" style="margin-top:-6px;margin-bottom:10px">
+        <label><input type="radio" name="modo" value="ninguna" ${v.modoCuota==='ninguna'?'checked':''} onchange="evPrev()"><span>Sin cuota</span></label>
+        <label><input type="radio" name="modo" value="porPersona" ${v.modoCuota==='porPersona'?'checked':''} onchange="evPrev()"><span>Monto por persona</span></label>
+        <label><input type="radio" name="modo" value="total" ${v.modoCuota==='total'?'checked':''} onchange="evPrev()"><span>Total a dividir</span></label>
+      </div>
+      <label class="campo ${v.modoCuota==='ninguna'?'oculto':''}" id="evMontoBox"><span id="evMontoLbl">Monto</span>
+        <input type="number" step="0.01" min="0" name="monto" inputmode="decimal" value="${v.modoCuota==='total'?v.montoTotal:(v.montoPorPersona||'')}" oninput="evPrev()"></label>
+      <div class="aviso" id="evPrevTxt"></div>
+      ${ev && ev.pagos.length?'<div class="aviso amarillo">Este evento ya tiene pagos. Si cambias montos o participantes, los saldos de cada quien se recalculan solos.</div>':''}
+      <button class="btn full" type="submit">${ev?'Guardar cambios':(adm?'Crear evento':'Enviar propuesta')}</button>
+    </form>`);
+  evPrev();
+}
+function marcarTodos(v){ document.querySelectorAll('#fEv input[name=part]').forEach(c=>c.checked=v); evPrev(); }
+function evPrev(){
+  const f=$('#fEv'); if(!f) return;
+  const todos=f.aplica.value==='todos', modo=f.modo.value, monto=Number(f.monto.value)||0;
+  $('#evPart').classList.toggle('oculto',todos);
+  $('#evMontoBox').classList.toggle('oculto',modo==='ninguna');
+  $('#evMontoLbl').textContent = modo==='total'?'Monto total del evento':'Monto por persona';
+  const n = todos ? D.personas.filter(p=>p.activo).length : f.querySelectorAll('input[name=part]:checked').length;
+  let t = `${n} participante${n===1?'':'s'}`;
+  if(modo==='porPersona') t+=` · ${fmt(monto)} c/u · total esperado ${fmt(monto*n)}`;
+  if(modo==='total') t+=` · ${fmt(monto)} ÷ ${n} = ${fmt(n?monto/n:0)} c/u`;
+  $('#evPrevTxt').textContent=t;
+}
+function guardarEvento(e,id){
+  e.preventDefault();
+  const f=e.target, modo=f.modo.value, monto=Number(f.monto.value)||0;
+  const d={id:id||null,titulo:f.titulo.value,tipo:f.tipo.value,fecha:f.fecha.value,hora:f.hora.value,lugar:f.lugar.value,descripcion:f.descripcion.value,
+    aplicaTodos:f.aplica.value==='todos', participantes:[...f.querySelectorAll('input[name=part]:checked')].map(c=>c.value),
+    modoCuota:modo, montoTotal:modo==='total'?monto:0, montoPorPersona:modo==='porPersona'?monto:0};
+  correr(async()=>{
+    const r=await api('guardarEvento',d); cerrarModal(); await recargar();
+    if(!id){ diaSel=d.fecha; const dd=fdate(d.fecha); mesVista=new Date(dd.getFullYear(),dd.getMonth(),1); pintar(); }
+  }, id?'Cambios guardados':(yoAdmin()?'Evento creado':'Propuesta enviada al administrador'));
+  return false;
+}
+
+/* ==================== PAGOS ==================== */
+function bancoHtml(){
+  const b=D.banco;
+  if(!b.clabe && !b.cuenta && !b.tarjeta) return '<div class="aviso amarillo">El administrador aún no registra sus datos para transferencia.</div>';
+  const dato=(l,v)=> v?`<div class="dato"><div><small>${l}</small><b>${esc(v)}</b></div><button type="button" onclick="copiar('${jsq(v)}')">Copiar</button></div>`:'';
+  return `<div class="banco">${dato('Titular',b.titular)}${dato('Banco',b.banco)}${dato('CLABE interbancaria',b.clabe)}${dato('Número de cuenta',b.cuenta)}${dato('Tarjeta',b.tarjeta)}
+    ${b.nota?`<div style="font-size:12px;opacity:.85;margin-top:8px">${esc(b.nota)}</div>`:''}</div>`;
+}
+function formPago(eventoId, sugerido){
+  const ev = eventoId==='SALDO'?null:evento(eventoId);
+  abrirModal(ev?'Pagar: '+ev.titulo:'Abonar a mi saldo a favor', `
+    ${!ev?'<div class="aviso">Tu abono queda como saldo a favor y luego puedes aplicarlo a cualquier evento.</div>':''}
+    ${bancoHtml()}
+    <form onsubmit="return enviarPago(event,'${eventoId}')">
+      <label class="campo"><span>Monto que transferiste</span><input type="number" step="0.01" min="1" name="monto" inputmode="decimal" required value="${sugerido>0?sugerido:''}"></label>
+      <label class="campo"><span>Comprobante (foto o PDF)</span><input type="file" name="archivo" accept="image/*,application/pdf"></label>
+      <label class="campo"><span>Nota (opcional)</span><input type="text" name="nota" placeholder="Ej. referencia, banco de origen"></label>
+      <button class="btn full" type="submit">Enviar comprobante</button>
+      <p class="sub" style="text-align:center">El administrador validará el depósito al recibirlo.</p>
+    </form>`);
+}
+async function enviarPago(e, eventoId){
+  e.preventDefault(); const f=e.target;
+  await correr(async()=>{
+    const archivo = await leerArchivo(f.archivo.files[0]);
+    await api('registrarPago',{eventoId,monto:f.monto.value,nota:f.nota.value,archivo});
+    cerrarModal(); await recargar();
+  },'Enviado. Queda en revisión hasta que el admin lo valide.');
+  return false;
+}
+function formPagoAdmin(eventoId, personaId, sugerido){
+  const ev = eventoId==='SALDO'?null:evento(eventoId);
+  const lista = ev ? ev.cuentas.map(c=>persona(c.personaId)).filter(p=>p.id) : D.personas.filter(p=>p.activo);
+  D.personas.filter(p=>p.activo && !lista.find(x=>x.id===p.id)).forEach(p=>lista.push(p));
+  abrirModal(ev?'Registrar pago · '+ev.titulo:'Registrar abono a saldo a favor', `
+    <form onsubmit="return enviarPagoAdmin(event,'${eventoId}')">
+      <label class="campo"><span>Persona</span><select name="persona" required onchange="sugerirMonto(this,'${eventoId}')">
+        <option value="">Selecciona…</option>${lista.map(p=>`<option value="${p.id}" ${p.id===personaId?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select></label>
+      <div class="opciones" style="margin-bottom:12px">
+        <label><input type="radio" name="tipo" value="efectivo" checked><span>💵 Efectivo</span></label>
+        <label><input type="radio" name="tipo" value="transferencia"><span>🏦 Transferencia</span></label>
+      </div>
+      <label class="campo"><span>Monto</span><input type="number" step="0.01" min="0.01" name="monto" inputmode="decimal" required value="${sugerido>0?sugerido:''}"></label>
+      <label class="campo"><span>Comprobante (opcional)</span><input type="file" name="archivo" accept="image/*,application/pdf"></label>
+      <label class="campo"><span>Nota (opcional)</span><input type="text" name="nota"></label>
+      <button class="btn full" type="submit">Registrar pago validado</button>
+    </form>`);
+}
+function sugerirMonto(sel, eventoId){
+  const ev=evento(eventoId); if(!ev) return;
+  const c=ev.cuentas.find(x=>x.personaId===sel.value);
+  if(c && c.saldo>0) sel.form.monto.value=c.saldo;
+}
+async function enviarPagoAdmin(e, eventoId){
+  e.preventDefault(); const f=e.target;
+  await correr(async()=>{
+    const archivo = await leerArchivo(f.archivo.files[0]);
+    await api('registrarPago',{eventoId,personaId:f.persona.value,tipo:f.tipo.value,monto:f.monto.value,nota:f.nota.value,archivo});
+    cerrarModal(); await recargar();
+  },'Pago registrado');
+  return false;
+}
+function disponibleEn(pid, origen){
+  if(origen==='SALDO') return persona(pid).saldoFavor;
+  const c=(evento(origen)||{cuentas:[]}).cuentas.find(x=>x.personaId===pid);
+  return c? Math.max(0,-c.saldo):0;
+}
+function formTraspaso(pid, origen, destino){
+  const p=persona(pid);
+  const origenes=[{id:'SALDO',t:'Saldo a favor'}].concat(D.eventos.filter(e=>e.estado==='aprobado').map(e=>{const c=e.cuentas.find(x=>x.personaId===pid); return c&&c.saldo<-0.009?{id:e.id,t:'Excedente en '+e.titulo}:null}).filter(Boolean));
+  const destinos=[{id:'SALDO',t:'Saldo a favor'}].concat(D.eventos.filter(e=>e.estado==='aprobado'&&(e.participantes.includes(pid)||e.cuentas.find(x=>x.personaId===pid))).map(e=>{const c=e.cuentas.find(x=>x.personaId===pid); return {id:e.id,t:e.titulo+' ('+fechaLarga(e.fecha)+')'+(c&&c.saldo>0?' · debe '+fmt(c.saldo):'')}}));
+  if(!origenes.find(o=>o.id===origen)) origen=(origenes.find(o=>disponibleEn(pid,o.id)>0.009)||origenes[0]).id;
+  if(!destino || destino===origen){ const d=destinos.find(o=>o.id!==origen && (evento(o.id)||{cuentas:[]}).cuentas.some(x=>x.personaId===pid&&x.saldo>0.009)) || destinos.find(o=>o.id!==origen); destino=d?d.id:''; }
+  abrirModal('Mover saldo · '+p.nombre, `
+    <div class="aviso">Mueve dinero ya validado: aplica un saldo a favor a un evento, o pasa lo que sobró de un evento a tu saldo a favor.</div>
+    <form id="fTr" onsubmit="return enviarTraspaso(event,'${pid}')">
+      <label class="campo"><span>De</span><select name="origen" onchange="trPrev('${pid}')">${origenes.map(o=>`<option value="${o.id}" ${o.id===origen?'selected':''}>${esc(o.t)}</option>`).join('')}</select></label>
+      <div class="sub" id="trDisp" style="margin:-6px 0 12px"></div>
+      <label class="campo"><span>Hacia</span><select name="destino" onchange="trPrev('${pid}')">${destinos.map(o=>`<option value="${o.id}" ${o.id===destino?'selected':''}>${esc(o.t)}</option>`).join('')}</select></label>
+      <label class="campo"><span>Monto</span><input type="number" step="0.01" min="0.01" name="monto" inputmode="decimal" required></label>
+      <button class="btn full" type="submit">Mover</button>
+    </form>`);
+  trPrev(pid, true);
+}
+function trPrev(pid, inicial){
+  const f=$('#fTr'); if(!f) return;
+  const disp=disponibleEn(pid,f.origen.value);
+  $('#trDisp').textContent='Disponible: '+fmt(disp);
+  const ev=evento(f.destino.value), c=ev&&ev.cuentas.find(x=>x.personaId===pid);
+  const debe = c&&c.saldo>0 ? c.saldo : disp;
+  f.monto.value = r2(Math.min(disp, debe)) || '';
+}
+function enviarTraspaso(e,pid){
+  e.preventDefault(); const f=e.target;
+  accion('moverSaldo',{personaId:pid,origen:f.origen.value,destino:f.destino.value,monto:f.monto.value},'Saldo movido');
+  return false;
+}
+
+/* ==================== GASTOS / FOTOS ==================== */
+function formGasto(eventoId, gastoId){
+  const g = gastoId ? evento(eventoId).gastos.find(x=>x.id===gastoId) : {concepto:'',monto:''};
+  abrirModal(gastoId?'Editar gasto':'Nuevo gasto', `
+    <form onsubmit="return enviarGasto(event,'${eventoId}','${gastoId||''}')">
+      <label class="campo"><span>Concepto</span><input type="text" name="concepto" required value="${esc(g.concepto)}" placeholder="Ej. Flores de cempasúchil"></label>
+      <label class="campo"><span>Monto</span><input type="number" step="0.01" min="0.01" name="monto" inputmode="decimal" required value="${g.monto}"></label>
+      <label class="campo"><span>Comprobante / ticket ${gastoId&&g.archivoId?'(sube otro para reemplazar)':'(opcional)'}</span><input type="file" name="archivo" accept="image/*,application/pdf"></label>
+      <button class="btn full" type="submit">Guardar gasto</button>
+      ${gastoId?`<button class="btn bad full" type="button" style="margin-top:8px" onclick="if(confirm('¿Borrar gasto?'))accion('borrarGasto',{id:'${gastoId}'},'Gasto borrado')">Borrar gasto</button>`:''}
+    </form>`);
+}
+async function enviarGasto(e, eventoId, id){
+  e.preventDefault(); const f=e.target;
+  await correr(async()=>{
+    const archivo=await leerArchivo(f.archivo.files[0]);
+    await api('guardarGasto',{id:id||null,eventoId,concepto:f.concepto.value,monto:f.monto.value,archivo});
+    cerrarModal(); await recargar();
+  },'Gasto guardado');
+  return false;
+}
+async function subirFotos(eventoId, input){
+  const files=[...input.files]; if(!files.length) return;
+  await correr(async()=>{
+    for(let i=0;i<files.length;i++){
+      toast(`Subiendo foto ${i+1} de ${files.length}…`);
+      const a=await leerArchivo(files[i]);
+      await api('subirFoto',{eventoId,archivo:a});
+    }
+    await recargar();
+  },'Fotos subidas');
+  input.value='';
+}
+function opcionesFoto(id, archivoId){
+  abrirModal('Foto', `<img src="${thumb(archivoId,1600)}" style="width:100%;border-radius:12px;background:#e2e8f0" alt="">
+    <div class="fila-btn"><a class="btn sec" style="text-decoration:none" target="_blank" href="https://drive.google.com/file/d/${archivoId}/view">Abrir original</a>
+    <button class="btn bad" onclick="if(confirm('¿Borrar foto?'))accion('borrarFoto',{id:'${id}'},'Foto borrada')">Borrar</button></div>`);
+}
+
+/* ==================== CUENTAS ==================== */
+function vistaCuentas(){
+  const yo=persona(D.yo.id);
+  const lista=D.personas.filter(p=>p.activo && p.nombre.toLowerCase().includes(filtroCuentas.toLowerCase()));
+  const totalDeuda=D.personas.reduce((a,p)=>a+p.adeudo,0);
+  return `<div class="card">
+      <div class="sub">Mi estado de cuenta</div>
+      <div class="kpis" style="margin-top:8px">
+        <div class="kpi"><small>Debo</small><b class="${yo.adeudo>0?'rojo':''}">${fmt(yo.adeudo)}</b></div>
+        <div class="kpi"><small>Saldo a favor</small><b class="verde">${fmt(yo.saldoFavor)}</b></div>
+        <div class="kpi"><small>En revisión</small><b style="color:var(--warn)">${fmt(yo.enRevision)}</b></div>
+      </div>
+      <div class="fila-btn">
+        <button class="btn" onclick="verPersona('${D.yo.id}')">Ver mi detalle</button>
+        <button class="btn sec" onclick="formPago('SALDO',0)">Abonar a saldo a favor</button>
+      </div></div>
+    <div class="titulo-sec"><span>Todos · por cobrar ${fmt(totalDeuda)}</span>${yoAdmin()?`<button class="btn chico sec" onclick="formPagoAdmin('SALDO')">+ Abono</button>`:''}</div>
+    <input type="text" class="buscar" placeholder="Buscar persona…" value="${esc(filtroCuentas)}" oninput="filtroCuentas=this.value;pintarListaCuentas()">
+    <div id="listaCuentas">${listaCuentasHtml(lista)}</div>`;
+}
+function listaCuentasHtml(lista){
+  return `<div class="card" style="padding:4px 12px"><table class="tabla">${lista.map(p=>`
+    <tr class="clic" onclick="verPersona('${p.id}')"><td><b>${esc(p.nombre)}</b> ${!p.tieneCuenta?'<span class="chip gris">sin cuenta</span>':''}
+      ${p.saldoFavor>0?`<div class="sub verde">A favor ${fmt(p.saldoFavor)}</div>`:''}</td>
+      <td class="der">${p.adeudo>0.009?`<span class="chip bad">Debe ${fmt(p.adeudo)}</span>`:'<span class="chip ok">Al corriente</span>'}${p.enRevision>0?`<div style="margin-top:3px"><span class="chip warn">Revisión ${fmt(p.enRevision)}</span></div>`:''}</td></tr>`).join('')}</table>
+    ${!lista.length?'<div class="vacio">Sin resultados</div>':''}</div>`;
+}
+function pintarListaCuentas(){
+  const lista=D.personas.filter(p=>p.activo && p.nombre.toLowerCase().includes(filtroCuentas.toLowerCase()));
+  $('#listaCuentas').innerHTML=listaCuentasHtml(lista);
+}
+function verPersona(pid){
+  const m=abrirModal(()=>persona(pid).nombre, ()=>{
+    const p=persona(pid), adm=yoAdmin(), yo=pid===D.yo.id;
+    const det=p.detalle.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    return `<div class="kpis">
+        <div class="kpi"><small>Debe</small><b class="${p.adeudo>0?'rojo':''}">${fmt(p.adeudo)}</b></div>
+        <div class="kpi"><small>Saldo a favor</small><b class="verde">${fmt(p.saldoFavor)}</b></div>
+        <div class="kpi"><small>En revisión</small><b style="color:var(--warn)">${fmt(p.enRevision)}</b></div></div>
+      ${(adm||yo)?`<div class="fila-btn">
+        ${adm?`<button class="btn" onclick="formPagoAdmin('SALDO','${pid}')">Registrar abono</button>`:''}
+        ${p.saldoFavor>0||p.excedente>0?`<button class="btn sec" onclick="formTraspaso('${pid}','${p.saldoFavor>0?'SALDO':''}')">Mover saldo</button>`:''}</div>`:''}
+      <div class="titulo-sec"><span>Por evento</span></div>
+      <div class="card" style="padding:4px 12px">${det.length?`<table class="tabla">${det.map(x=>`
+        <tr class="clic" onclick="abrirEvento('${x.eventoId}')"><td><b>${esc(x.titulo)}</b><div class="sub">${fechaLarga(x.fecha)} · cuota ${fmt(x.cuota)} · pagado ${fmt(x.pagado)}</div></td>
+        <td class="der">${chipPago(x)||'<span class="chip gris">—</span>'}</td></tr>`).join('')}</table>`:'<div class="vacio">Sin eventos asignados</div>'}</div>
+      ${p.movsSaldo.length?`<div class="titulo-sec"><span>Movimientos de saldo a favor</span></div>
+        <div class="card" style="padding:4px 12px">${p.movsSaldo.map(mv=>itemPago(Object.assign({personaId:pid,nombre:p.nombre},mv),false)).join('')}</div>`:''}`;
+  });
+  m.vivo=true;
+}
+
+/* ==================== FONDO ==================== */
+function vistaFondo(){
+  const f=D.fondo, adm=yoAdmin();
+  return `<div class="card" style="text-align:center;background:linear-gradient(135deg,#065f46,#16a34a);color:#fff">
+      <div style="opacity:.85">Fondo grupal disponible</div><div class="grande">${fmt(f.saldo)}</div>
+      <div style="font-size:12px;opacity:.85">Sobrantes de eventos y aportaciones. Se puede asignar a eventos o guardar como fondo de emergencia.</div></div>
+    ${adm?`<div class="fila-btn"><button class="btn ok" onclick="formFondo('ingreso')">+ Ingreso</button><button class="btn sec" onclick="formFondo('egreso')">− Retiro / asignar</button></div>`:''}
+    <div class="titulo-sec"><span>Movimientos</span></div>
+    <div class="card" style="padding:4px 12px">${f.movimientos.length? f.movimientos.map(m=>`<div class="item">
+      <div class="mini" style="display:flex;align-items:center;justify-content:center">${m.tipo==='ingreso'?'⬆️':'⬇️'}</div>
+      <div class="cuerpo"><b>${esc(m.concepto||(m.tipo==='ingreso'?'Ingreso':'Retiro'))}</b>
+        <div class="sub">${esc(m.fecha)}${m.eventoTitulo?` · <a href="#" onclick="abrirEvento('${m.eventoId}');return false">${esc(m.eventoTitulo)}</a>`:''}</div></div>
+      <span class="monto ${m.tipo==='ingreso'?'verde':'rojo'}">${m.tipo==='ingreso'?'+':'−'} ${fmt(m.monto)}</span>
+      ${adm?`<button class="btn chico gris" onclick="if(confirm('¿Borrar movimiento del fondo?'))accion('borrarFondo',{id:'${m.id}'},'Movimiento borrado',false)">🗑</button>`:''}
+    </div>`).join('') : '<div class="vacio">Aún no hay movimientos</div>'}</div>`;
+}
+function formFondo(tipo, eventoId, monto, concepto){
+  const evs=D.eventos.filter(e=>e.estado==='aprobado').slice().reverse();
+  abrirModal(tipo==='ingreso'?'Ingreso al fondo':'Retiro / asignación del fondo', `
+    <div class="aviso">Disponible en el fondo: <b>${fmt(D.fondo.saldo)}</b></div>
+    <form onsubmit="return enviarFondo(event)">
+      <div class="opciones" style="margin-bottom:12px">
+        <label><input type="radio" name="tipo" value="ingreso" ${tipo==='ingreso'?'checked':''}><span>⬆️ Ingreso</span></label>
+        <label><input type="radio" name="tipo" value="egreso" ${tipo==='egreso'?'checked':''}><span>⬇️ Retiro / asignar</span></label>
+      </div>
+      <label class="campo"><span>Monto</span><input type="number" step="0.01" min="0.01" name="monto" inputmode="decimal" required value="${monto>0?r2(monto):''}"></label>
+      <label class="campo"><span>Evento relacionado (opcional)</span><select name="evento"><option value="">— Ninguno (fondo de emergencia / otro) —</option>
+        ${evs.map(e=>`<option value="${e.id}" ${e.id===eventoId?'selected':''}>${esc(e.titulo)} · ${fechaLarga(e.fecha)}</option>`).join('')}</select></label>
+      <label class="campo"><span>Concepto</span><input type="text" name="concepto" value="${esc(concepto||'')}" placeholder="Ej. Sobrante, emergencia, apoyo…"></label>
+      <div class="sub" style="margin-bottom:12px">Ingreso con evento = sobrante enviado al fondo. Retiro con evento = el fondo aporta dinero a ese evento.</div>
+      <button class="btn full" type="submit">Guardar</button>
+    </form>`);
+}
+function enviarFondo(e){
+  e.preventDefault(); const f=e.target;
+  accion('movimientoFondo',{tipo:f.tipo.value,monto:f.monto.value,eventoId:f.evento.value,concepto:f.concepto.value},'Fondo actualizado');
+  return false;
+}
+
+/* ==================== ADMIN ==================== */
+function vistaAdmin(){
+  if(!yoAdmin()) return '';
+  const P=D.pendientes, b=D.banco;
+  const props=P.propuestas.map(evento).filter(Boolean);
+  return `<div class="titulo-sec"><span>Pagos por validar (${P.pagos.length})</span></div>
+    <div class="card" style="padding:4px 12px">${P.pagos.length? P.pagos.map(p=>`<div class="item">
+      ${p.archivoId?`<img class="mini" src="${thumb(p.archivoId,200)}" onclick="verArchivo('${p.archivoId}')" alt="">`:'<div class="mini" style="display:flex;align-items:center;justify-content:center">🏦</div>'}
+      <div class="cuerpo"><b>${esc(p.nombre)}</b> · <span class="monto">${fmt(p.monto)}</span>
+        <div class="sub">${esc(p.eventoTitulo)} · ${esc(p.fecha)}</div>${p.nota?`<div class="sub">${esc(p.nota)}</div>`:''}
+        ${!p.archivoId?'<div class="sub" style="color:var(--warn)">Sin comprobante</div>':''}
+        <div class="fila-btn" style="margin-top:6px"><button class="btn chico ok" onclick="accion('revisarPago',{id:'${p.id}',aprobar:true},'Pago validado',false)">✓ Validar</button>
+        <button class="btn chico bad" onclick="accion('revisarPago',{id:'${p.id}',aprobar:false},'Pago rechazado',false)">Rechazar</button></div></div></div>`).join('') : '<div class="vacio">Nada por validar 🎉</div>'}</div>
+
+    <div class="titulo-sec"><span>Fechas propuestas (${props.length})</span></div>
+    ${props.length? props.map(tarjetaEvento).join('') : '<div class="card vacio">Sin propuestas pendientes</div>'}
+
+    <div class="titulo-sec"><span>Personas (${D.personas.length})</span><button class="btn chico sec" onclick="formPersona()">+ Agregar</button></div>
+    <div class="card" style="padding:4px 12px"><table class="tabla">${D.personas.map(p=>`
+      <tr class="clic" onclick="formPersona('${p.id}')"><td><b>${esc(p.nombre)}</b><div class="sub">${p.email?esc(p.email):'Sin cuenta (solo en listas)'}</div></td>
+      <td class="der">${p.rol==='admin'?'<span class="chip pri">Admin</span> ':''}${!p.activo?'<span class="chip gris">Inactivo</span>':''}</td></tr>`).join('')}</table></div>
+
+    <div class="titulo-sec"><span>Datos para transferencias</span></div>
+    <form class="card" onsubmit="return guardarBanco(event)">
+      <label class="campo"><span>Titular</span><input type="text" name="titular" value="${esc(b.titular)}"></label>
+      <label class="campo"><span>Banco</span><input type="text" name="banco" value="${esc(b.banco)}"></label>
+      <label class="campo"><span>CLABE interbancaria</span><input type="tel" name="clabe" maxlength="18" value="${esc(b.clabe)}"></label>
+      <div class="dos"><label class="campo"><span>No. de cuenta</span><input type="tel" name="cuenta" value="${esc(b.cuenta)}"></label>
+      <label class="campo"><span>Tarjeta (opcional)</span><input type="tel" name="tarjeta" value="${esc(b.tarjeta)}"></label></div>
+      <label class="campo"><span>Nota para quien paga</span><input type="text" name="nota" value="${esc(b.nota)}" placeholder="Ej. Pon tu nombre en el concepto"></label>
+      <button class="btn full" type="submit">Guardar datos</button>
+    </form>`;
+}
+function guardarBanco(e){
+  e.preventDefault(); const f=e.target;
+  accion('guardarConfig',{titular:f.titular.value,banco:f.banco.value,clabe:f.clabe.value,cuenta:f.cuenta.value,tarjeta:f.tarjeta.value,nota:f.nota.value},'Datos guardados',false);
+  return false;
+}
+function formPersona(id){
+  const p = id ? persona(id) : {nombre:'',email:'',rol:'miembro',activo:true};
+  abrirModal(id?'Editar persona':'Agregar persona', `
+    <form onsubmit="return enviarPersona(event,'${id||''}')">
+      <label class="campo"><span>Nombre</span><input type="text" name="nombre" required value="${esc(p.nombre)}"></label>
+      <label class="campo"><span>Correo (opcional)</span><input type="email" name="email" value="${esc(p.email)}" placeholder="Si lo pones, podrá entrar con ese correo"></label>
+      <div class="sub" style="margin:-6px 0 12px">Sin correo, la persona aparece en listas y cuotas pero no entra a la app.</div>
+      <div class="opciones" style="margin-bottom:12px">
+        <label><input type="radio" name="rol" value="miembro" ${p.rol!=='admin'?'checked':''}><span>Miembro</span></label>
+        <label><input type="radio" name="rol" value="admin" ${p.rol==='admin'?'checked':''}><span>Administrador</span></label>
+      </div>
+      <div class="opciones" style="margin-bottom:14px">
+        <label><input type="radio" name="activo" value="si" ${p.activo?'checked':''}><span>Activo</span></label>
+        <label><input type="radio" name="activo" value="no" ${!p.activo?'checked':''}><span>Inactivo</span></label>
+      </div>
+      <button class="btn full" type="submit">Guardar</button>
+      ${id?`<button type="button" class="btn gris full" style="margin-top:8px" onclick="cerrarModal();verPersona('${id}')">Ver estado de cuenta</button>`:''}
+    </form>`);
+}
+function enviarPersona(e,id){
+  e.preventDefault(); const f=e.target;
+  accion('guardarPersona',{id:id||null,nombre:f.nombre.value,email:f.email.value,rol:f.rol.value,activo:f.activo.value==='si'},'Persona guardada');
+  return false;
+}
+
+iniciar();
+</script>
+</body>
+</html>
