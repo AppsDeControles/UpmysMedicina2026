@@ -473,7 +473,7 @@ function tarjetaEvento(ev){
     <div class="info">
       <h3>${ICONOS[ev.tipo]||''} ${esc(ev.titulo)}</h3>
       <div class="sub">${esc(ev.tipo)}${ev.hora?' · '+esc(ev.hora):''}${ev.lugar?' · '+esc(ev.lugar):''}</div>
-      <div class="chips">${chipEstadoEvento(ev)}${ev.cuotaPP?`<span class="chip pri">Cuota ${fmt(ev.cuotaPP)}</span>`:''}${chipPago(c)}</div>
+      <div class="chips">${chipEstadoEvento(ev)}${ev.cuotaPP?`<span class="chip pri">Cuota ${fmt(ev.cuotaPP)}</span>`:''}${chipPago(c)}${chipArticulos(ev)}</div>
     </div></div>`;
 }
 function vistaCalendario(){
@@ -496,6 +496,8 @@ function vistaCalendario(){
     lista=D.eventos.filter(e=>e.creadoPor===D.yo.id && e.estado!=='aprobado'); tituloLista='Mis propuestas';
   } else if(filtroLista==='debo'){
     lista=D.eventos.filter(e=>{const c=miCuenta(e); return e.estado==='aprobado' && c && c.saldo>0.009}); tituloLista='Con pago pendiente';
+  } else if(filtroLista==='llevo'){
+    lista=D.eventos.filter(e=>e.estado==='aprobado' && misArticulos(e).some(a=>!a.entregados.includes(D.yo.id))); tituloLista='Me toca llevar';
   } else {
     lista=D.eventos.filter(e=>e.fecha>=h && e.estado!=='rechazado'); tituloLista='Próximos eventos';
   }
@@ -507,7 +509,7 @@ function vistaCalendario(){
     ${bannerMes(m)}
     <div class="grid">${g}</div>
     <div class="leyenda">${Object.keys(COLORES).map(t=>`<span><i class="punto" style="background:${COLORES[t]}"></i>${t}</span>`).join('')}<span><i class="punto prop"></i>Propuesta</span></div>
-    <div class="filtros">${f('proximos','Próximos')}${f('debo','Debo')}${f('pasados','Pasados')}${f('mios','Mis propuestas')}</div>
+    <div class="filtros">${f('proximos','Próximos')}${f('debo','Debo')}${f('llevo','🎁 Llevo')}${f('pasados','Pasados')}${f('mios','Mis propuestas')}</div>
     <div class="titulo-sec"><span>${esc(tituloLista)}</span>${diaSel?`<button class="btn chico gris" onclick="diaSel=null;pintar()">Ver todos</button>`:''}</div>
     ${lista.length? lista.map(tarjetaEvento).join('') : `<div class="vacio">Sin eventos${diaSel?` este día.<br><br><button class="btn sec" onclick="formEvento(null,'${diaSel}')">${yoAdmin()?'Crear evento':'Proponer fecha'} aquí</button>`:''}</div>`}`;
 }
@@ -577,6 +579,8 @@ function fichaEvento(ev){
   } else {
     h+=`<div class="card sub">Este evento no tiene cuota.${adm?' Edítalo si necesitas asignar una.':''}</div>`;
   }
+
+  h += seccionArticulos(ev);
 
   // ---- Gastos ----
   if(ev.gastos.length || adm){
@@ -1170,6 +1174,89 @@ async function instalarApp(){
   }
   abrirModal('Instalar en tu celular', `<div style="text-align:center;margin-bottom:12px"><img src="icon-192.png" style="width:72px;border-radius:16px" alt=""></div>${pasos}
     <button class="btn full" style="margin-top:14px" onclick="cerrarModal()">Entendido</button>`);
+}
+
+/* ==================== ARTÍCULOS A LLEVAR ==================== */
+function misArticulos(ev){ return (ev.articulos||[]).filter(a=>a.asignados.includes(D.yo.id)); }
+function chipArticulos(ev){
+  const p=misArticulos(ev).filter(a=>!a.entregados.includes(D.yo.id)); if(!p.length) return '';
+  return `<span class="chip warn" style="max-width:100%;overflow:hidden;text-overflow:ellipsis">🎁 Llevar: ${esc(p[0].descripcion)}${p.length>1?' +'+(p.length-1):''}</span>`;
+}
+function seccionArticulos(ev){
+  const adm=yoAdmin(), arts=ev.articulos||[];
+  if(!arts.length && !adm) return '';
+  let h=`<div class="titulo-sec"><span>🎁 Artículos a llevar</span>${adm?`<button class="btn chico sec" onclick="formArticulo('${ev.id}')">+ Artículo</button>`:''}</div>`;
+  if(!arts.length) return h+'<div class="card vacio">Sin artículos asignados. Usa “+ Artículo” para pedir flores, papel, tela, etc.</div>';
+  const mios=misArticulos(ev);
+  if(mios.length){
+    h+=`<div class="card" style="border:2px solid var(--pri)"><div class="sub">Te toca llevar</div>${mios.map(a=>{const ok=a.entregados.includes(D.yo.id);
+      return `<div class="item"><div class="cuerpo"><b>${esc(a.descripcion)}</b></div>
+        <button class="btn chico ${ok?'ok':'sec'}" onclick="accion('marcarEntrega',{id:'${a.id}',entregado:${!ok}},'${ok?'Marcado como pendiente':'¡Gracias! Marcado como entregado'}',false)">${ok?'✓ Entregado':'Marcar entregado'}</button></div>`}).join('')}</div>`;
+  }
+  const gen=arts.filter(a=>a.paraTodos), ind=arts.filter(a=>!a.paraTodos).sort((x,y)=>x.nombre.localeCompare(y.nombre));
+  h+=`<div class="card" style="padding:4px 12px">`;
+  gen.forEach(a=>{ const listo=a.asignados.length&&a.entregados.length>=a.asignados.length;
+    h+=`<div class="item" style="cursor:pointer" onclick="verArticulo('${ev.id}','${a.id}')"><div class="mini" style="display:flex;align-items:center;justify-content:center">👥</div>
+      <div class="cuerpo"><b>${esc(a.descripcion)}</b><div class="sub">Cada participante</div></div>
+      <span class="chip ${listo?'ok':'warn'}">${a.entregados.length}/${a.asignados.length}</span></div>`; });
+  ind.forEach(a=>{ const ok=a.entregados.length>0;
+    h+=`<div class="item" style="cursor:pointer" onclick="verArticulo('${ev.id}','${a.id}')"><div class="mini" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--pri);background:var(--pri2)">${esc(iniciales(a.nombre))}</div>
+      <div class="cuerpo"><b>${esc(a.nombre)}</b><div class="sub">${esc(a.descripcion)}</div></div>
+      <span class="chip ${ok?'ok':'warn'}">${ok?'Entregado':'Pendiente'}</span></div>`; });
+  return h+'</div>';
+}
+function verArticulo(evId, artId){
+  const m=abrirModal('Artículo', ()=>{
+    const ev=evento(evId); if(!ev) return null; const a=(ev.articulos||[]).find(x=>x.id===artId); if(!a) return null;
+    const adm=yoAdmin();
+    const filas=a.asignados.map(pid=>{ const ok=a.entregados.includes(pid), puede=adm||pid===D.yo.id;
+      return `<tr><td><b>${esc(persona(pid).nombre)}</b></td><td class="der">${puede
+        ?`<button class="btn chico ${ok?'ok':'gris'}" onclick="accion('marcarEntrega',{id:'${a.id}',personaId:'${pid}',entregado:${!ok}},'Actualizado',false)">${ok?'✓ Entregado':'Pendiente'}</button>`
+        :`<span class="chip ${ok?'ok':'warn'}">${ok?'Entregado':'Pendiente'}</span>`}</td></tr>`; }).join('');
+    return `<div class="card"><div class="sub">${a.paraTodos?'Cada participante lleva':'Le toca a '+esc(a.nombre)}</div><h3 style="margin:4px 0 0">${esc(a.descripcion)}</h3></div>
+      <div class="card" style="padding:4px 12px"><table class="tabla">${filas||'<tr><td class="sub">Sin participantes</td></tr>'}</table></div>
+      ${adm?`<div class="fila-btn"><button class="btn gris" onclick="formArticulo('${evId}','${a.id}')">✏️ Editar</button>
+        <button class="btn bad" onclick="if(confirm('¿Quitar este artículo?'))accion('borrarArticulo',{id:'${a.id}'},'Artículo quitado')">🗑 Quitar</button></div>`:''}`;
+  });
+  m.vivo=true;
+}
+function formArticulo(evId, artId){
+  const ev=evento(evId), a=artId?(ev.articulos||[]).find(x=>x.id===artId):null;
+  const gente=ev.participantes.map(persona).filter(p=>p.id).sort((x,y)=>x.nombre.localeCompare(y.nombre));
+  abrirModal(a?'Editar artículo':'Nuevo artículo', `<form id="fArt" onsubmit="return enviarArticulo(event,'${evId}','${artId||''}')">
+    <label class="campo"><span>¿Qué hay que llevar?</span><input type="text" name="desc" required value="${esc(a?a.descripcion:'')}" placeholder="Ej. 43 flores de cempasúchil"></label>
+    <label class="campo"><span>¿A quién le toca?</span></label>
+    <div class="opciones" style="margin-top:-6px;margin-bottom:10px">
+      <label><input type="radio" name="para" value="todos" ${!a||a.paraTodos?'checked':''} onchange="artPrev()"><span>👥 Todos, lo mismo</span></label>
+      <label><input type="radio" name="para" value="algunos" ${a&&!a.paraTodos?'checked':''} onchange="artPrev()"><span>👤 Persona específica</span></label>
+    </div>
+    <div id="artGente" style="margin-bottom:12px">
+      <div class="lista-check">${gente.map(p=>`<label><input type="${a?'radio':'checkbox'}" name="per" value="${p.id}" ${a&&a.personaId===p.id?'checked':''}> ${esc(p.nombre)}</label>`).join('')||'<label class="sub">El evento no tiene participantes</label>'}</div>
+      ${!a?'<div class="sub" style="margin-top:6px">Si marcas varias personas, a cada una le toca lo mismo. Para cosas distintas usa “Agregar y poner otro”.</div>':''}
+    </div>
+    <div class="aviso" id="artTxt"></div>
+    <button class="btn full" type="submit">${a?'Guardar':'Agregar'}</button>
+    ${!a?`<button class="btn sec full" type="button" style="margin-top:8px" onclick="enviarArticulo(null,'${evId}','',true)">Agregar y poner otro</button>`:''}
+  </form>`);
+  artPrev();
+}
+function artPrev(){
+  const f=$('#fArt'); if(!f) return; const t=f.para.value==='todos';
+  $('#artGente').classList.toggle('oculto',t);
+  const n=f.querySelectorAll('input[name=per]').length;
+  $('#artTxt').textContent = t ? `A cada uno de los ${n} participantes le tocará llevarlo.` : 'Elige a quién le toca.';
+}
+async function enviarArticulo(e, evId, id, otro){
+  if(e) e.preventDefault();
+  const f=$('#fArt'); if(!f.reportValidity()) return false;
+  const d={id:id||null,eventoId:evId,paraTodos:f.para.value==='todos',personas:[...f.querySelectorAll('input[name=per]:checked')].map(x=>x.value),descripcion:f.desc.value};
+  if(!d.paraTodos && !d.personas.length){ toast('Elige a quién le toca',true); return false; }
+  await correr(async()=>{
+    await api('guardarArticulo',d);
+    if(otro){ f.desc.value=''; f.querySelectorAll('input[name=per]').forEach(x=>x.checked=false); await recargar(); f.desc.focus(); }
+    else { cerrarModal(); await recargar(); }
+  }, otro?'Agregado. Escribe el siguiente':'Artículo guardado');
+  return false;
 }
 
 iniciar();
