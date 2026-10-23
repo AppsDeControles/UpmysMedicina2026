@@ -286,8 +286,22 @@ function toast(msg, err){
 function cargando(on){ $('#loader').classList.toggle('oculto',!on); }
 
 async function api(accion, datos){
-  const r = await fetch(API_URL,{method:'POST',body:JSON.stringify({accion,token:TOKEN,datos:datos||{}})});
-  const j = await r.json();
+  const ctrl = ('AbortController' in window) ? new AbortController() : null;
+  const t = setTimeout(()=>ctrl&&ctrl.abort(), 45000);
+  let r, txt;
+  try{
+    r = await fetch(API_URL,{method:'POST',body:JSON.stringify({accion,token:TOKEN,datos:datos||{}}),signal:ctrl?ctrl.signal:undefined});
+    txt = await r.text();
+  }catch(e){
+    throw new Error(e.name==='AbortError' ? 'El servidor no respondió a tiempo. Revisa tu conexión e intenta de nuevo.' : 'Sin conexión con el servidor. Revisa tu internet.');
+  }finally{ clearTimeout(t); }
+  let j;
+  try{ j = JSON.parse(txt); }
+  catch(e){
+    const m = (txt.match(/<title>([^<]*)<\/title>/i)||[])[1] || '';
+    const det = (txt.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').match(/(Error|Excepción|Exception|SyntaxError|ReferenceError|TypeError)[^.]{0,160}/i)||[])[0] || '';
+    throw new Error('El servidor respondió con un error'+(m?' ('+m.trim()+')':'')+(det?': '+det:'')+'. Revisa que el código esté completo y que hayas hecho "Nueva versión" en Implementar.');
+  }
   if(!j.ok){
     if(j.error==='SESION'){ ls.del('cg_token'); TOKEN=null; setTimeout(()=>location.reload(),1500); throw new Error('Tu sesión terminó, vuelve a entrar'); }
     throw new Error(j.error);
@@ -374,12 +388,23 @@ function quitarSplash(){ const s=$('#splash'); if(!s) return; s.classList.add('f
 async function iniciar(){
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   const minimo = new Promise(r=>setTimeout(r,3200));
+  const lento = setTimeout(()=>{
+    const sp=$('#splash'); if(!sp || $('#splashMsg')) return;
+    sp.insertAdjacentHTML('beforeend','<div id="splashMsg" style="position:absolute;bottom:calc(env(safe-area-inset-bottom) + 40px);left:16px;right:16px;text-align:center;color:#fff;font-size:14px">Está tardando más de lo normal…<br><button class="btn" style="margin-top:10px;background:#fff;color:#0154a3" onclick="location.reload()">Reintentar</button></div>');
+  }, 15000);
+  let fallo='';
   if(TOKEN){
-    try{ await recargar(); await minimo; mostrarApp(); quitarSplash(); return; }
-    catch(e){}
+    try{ await recargar(); await minimo; clearTimeout(lento); mostrarApp(); quitarSplash(); return; }
+    catch(e){ fallo=e.message||String(e); }
   }
-  await minimo; quitarSplash();
+  await minimo; clearTimeout(lento); quitarSplash();
   mostrarLogin();
+  if(fallo && TOKEN) mostrarFallo(fallo);
+}
+function mostrarFallo(msg){
+  abrirModal('No se pudo cargar', `<div class="aviso amarillo" style="word-break:break-word">${esc(msg)}</div>
+    <button class="btn full" onclick="location.reload()">Reintentar</button>
+    <button class="btn gris full" style="margin-top:8px" onclick="copiar(${esc(JSON.stringify(msg))})">Copiar detalle</button>`);
 }
 async function mostrarLogin(){
   $('#app').classList.add('oculto'); $('#login').classList.remove('oculto');
@@ -1354,4 +1379,32 @@ function seccionAdminsB(){
   const c=D.catalogoPermisos||{}, ids=Object.keys(D.permisos||{}).filter(id=>persona(id).id);
   if(D.moderador && !ids.includes(D.moderador) && persona(D.moderador).id) ids.push(D.moderador);
   return `<div class="titulo-sec"><span>Administradores B (${ids.length})</span><button class="btn chico sec" onclick="elegirAdminB()">+ Designar</button></div>
-    <div class="card" style="padding:4px 12px">${ids.length? ids.map(id=>{const lista
+    <div class="card" style="padding:4px 12px">${ids.length? ids.map(id=>{const lista=(D.permisos[id]||[]).slice(); if(D.moderador===id&&!lista.includes('avisos')) lista.push('avisos');
+      return `<div class="item" style="cursor:pointer" onclick="formPermisos('${id}')"><div class="mini" style="display:flex;align-items:center;justify-content:center">🛡️</div>
+        <div class="cuerpo"><b>${esc(persona(id).nombre)}</b><div class="sub">${lista.map(k=>esc(c[k]||k)).join(' · ')}</div></div><span class="sub">✏️</span></div>`}).join('')
+      : '<div class="vacio">Nadie designado. Un administrador B solo puede hacer lo que tú le permitas.</div>'}</div>`;
+}
+function elegirAdminB(){
+  const cand=D.personas.filter(p=>p.activo&&p.tieneCuenta&&p.rol!=='admin');
+  abrirModal('Designar administrador B', `<div class="aviso">Elige a la persona. Solo aparecen quienes ya tienen cuenta (entraron con su correo).</div>
+    <div class="lista-check">${cand.map(p=>`<label onclick="cerrarModal();formPermisos('${p.id}')">👤 ${esc(p.nombre)}</label>`).join('')||'<label class="sub">No hay personas con cuenta</label>'}</div>`);
+}
+function formPermisos(pid){
+  const c=D.catalogoPermisos||{}, act=(D.permisos||{})[pid]||[], mod=D.moderador===pid;
+  abrirModal('Permisos · '+persona(pid).nombre, `<div class="aviso">Marca lo que esta persona puede hacer además de lo normal. Datos bancarios, fondo, colores, eliminar cuentas y permisos quedan solo para ti.</div>
+    <form onsubmit="return guardarPermisos(event,'${pid}')"><div class="lista-check" style="max-height:none;margin-bottom:12px">
+      ${Object.keys(c).map(k=>`<label><input type="checkbox" name="perm" value="${k}" ${act.includes(k)||(k==='avisos'&&mod)?'checked':''}> ${esc(c[k])}</label>`).join('')}
+    </div><button class="btn full" type="submit">Guardar permisos</button>
+    ${act.length||mod?`<button type="button" class="btn bad full" style="margin-top:8px" onclick="accion('guardarPermisos',{personaId:'${pid}',permisos:[]},'Ya no es administrador B')">Quitar todos los permisos</button>`:''}</form>`);
+}
+function guardarPermisos(e,pid){
+  e.preventDefault();
+  const permisos=[...e.target.querySelectorAll('input[name=perm]:checked')].map(x=>x.value);
+  accion('guardarPermisos',{personaId:pid,permisos},permisos.length?'Permisos guardados':'Ya no es administrador B');
+  return false;
+}
+
+iniciar();
+</script>
+</body>
+</html>
