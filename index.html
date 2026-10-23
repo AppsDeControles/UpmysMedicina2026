@@ -163,6 +163,12 @@ input.buscar{margin-bottom:10px}
 .fila-color b{width:90px;flex-shrink:0;text-transform:capitalize;font-size:14px}
 .fila-color input[type=text]{flex:1}
 input[type=color]{width:44px;height:40px;border:1.5px solid var(--line);border-radius:10px;padding:2px;background:#fff;flex-shrink:0}
+/* ---- estado de conexión ---- */
+#estadoRed{background:none;border:0;padding:0;display:flex;gap:4px;cursor:pointer;color:#fff;min-width:0}
+.red-chip{background:rgba(255,255,255,.18);color:#fff;border-radius:20px;padding:4px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.red-chip.off{background:#f59e0b;color:#1f2937}
+.red-chip.err{background:#fee2e2;color:#b91c1c}
+button[disabled]{cursor:not-allowed}
 /* ---- instalar ---- */
 .instalar{background:linear-gradient(135deg,var(--pri),#0f172a);color:#fff;border-radius:var(--r);padding:14px;margin-bottom:12px;display:flex;gap:12px;align-items:center}
 .instalar img{width:48px;height:48px;border-radius:12px;flex-shrink:0}
@@ -213,6 +219,7 @@ input[type=color]{width:44px;height:40px;border:1.5px solid var(--line);border-r
 <section id="app" class="oculto">
   <header>
     <h1 id="hdrTitulo">Calendario del Grupo</h1>
+    <button id="estadoRed" onclick="verSincronizacion()" aria-label="Estado de sincronización"></button>
     <button class="avatar" id="hdrAvatar" onclick="abrirPerfil()">?</button>
   </header>
   <main id="vista"></main>
@@ -271,7 +278,8 @@ const ymd = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const hoy = () => ymd(new Date());
 const fdate = f => new Date(f+'T12:00:00');
 const fechaLarga = f => { if(!f) return ''; const d=fdate(f); return DSEM[d.getDay()]+' '+d.getDate()+' de '+MESES[d.getMonth()]+' '+d.getFullYear(); };
-const thumb = (id,w=800) => 'https://drive.google.com/thumbnail?id='+id+'&sz=w'+w;
+const thumb = (id,w=800) => String(id).startsWith('local:') ? (LOCALES[id]||'icon-192.png') : 'https://drive.google.com/thumbnail?id='+id+'&sz=w'+w;
+const linkOriginal = id => String(id).startsWith('local:') ? '' : 'https://drive.google.com/file/d/'+id+'/view';
 const iniciales = n => String(n||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
 const persona = id => (D.personas.find(p=>p.id===id) || {nombre:'—'});
 const evento = id => D.eventos.find(e=>e.id===id);
@@ -293,7 +301,8 @@ async function api(accion, datos){
     r = await fetch(API_URL,{method:'POST',body:JSON.stringify({accion,token:TOKEN,datos:datos||{}}),signal:ctrl?ctrl.signal:undefined});
     txt = await r.text();
   }catch(e){
-    throw new Error(e.name==='AbortError' ? 'El servidor no respondió a tiempo. Revisa tu conexión e intenta de nuevo.' : 'Sin conexión con el servidor. Revisa tu internet.');
+    const err=new Error(e.name==='AbortError' ? 'El servidor no respondió a tiempo. Revisa tu conexión e intenta de nuevo.' : 'Sin conexión con el servidor. Revisa tu internet.');
+    err.red=true; throw err;
   }finally{ clearTimeout(t); }
   let j;
   try{ j = JSON.parse(txt); }
@@ -309,18 +318,17 @@ async function api(accion, datos){
   return j.data;
 }
 async function correr(fn, ok){
-  cargando(true);
-  try{ const r = await fn(); if(ok) toast(ok); return r; }
+  cargando(true); _ultOffline=false;
+  try{ const r = await fn(); if(ok) toast(_ultOffline ? ok+' · 📴 guardado en el celular, se enviará al haber internet' : ok); return r; }
   catch(e){ toast(e.message||'Ocurrió un error',true); throw e; }
   finally{ cargando(false); }
 }
 async function recargar(){
-  D = await api('datos');
-  pintar();
-  refrescarModales();
+  if(!navigator.onLine) return;
+  try{ await sincronizar(); }catch(e){ if(!e.red) throw e; }
 }
 async function accion(nombre, datos, ok, cerrar=true){
-  await correr(async()=>{ await api(nombre,datos); if(cerrar) cerrarModal(); await recargar(); }, ok);
+  try{ await correr(async()=>{ await escribir(nombre,datos); if(cerrar) cerrarModal(); }, ok); }catch(e){}
 }
 function copiar(txt){
   const fin=()=>toast('Copiado ✓');
@@ -380,7 +388,7 @@ function cerrarModal(o){
 function refrescarModales(){ pilaModales.filter(m=>m.vivo).forEach(pintarModal); }
 function verArchivo(id){
   abrirModal('Archivo', `<img src="${thumb(id,1600)}" style="width:100%;border-radius:12px;background:#e2e8f0" alt="">
-    <a class="btn sec full" style="margin-top:12px;text-decoration:none" target="_blank" href="https://drive.google.com/file/d/${id}/view">Abrir original</a>`);
+    ${linkOriginal(id)?`<a class="btn sec full" style="margin-top:12px;text-decoration:none" target="_blank" href="${linkOriginal(id)}">Abrir original</a>`:'<div class="aviso" style="margin-top:12px">📴 Este archivo se subirá cuando haya internet.</div>'}`);
 }
 
 /* ==================== INICIO / LOGIN ==================== */
@@ -394,8 +402,20 @@ async function iniciar(){
   }, 15000);
   let fallo='';
   if(TOKEN){
-    try{ await recargar(); await minimo; clearTimeout(lento); mostrarApp(); quitarSplash(); return; }
-    catch(e){ fallo=e.message||String(e); }
+    ULTIMA_SYNC=Number(ls.get('cg_ultima'))||0;
+    BASE=await kvGet('base')||null; OUTBOX=await kvGet('outbox')||[]; FALLIDOS=await kvGet('fallidos')||[];
+    if(BASE){
+      // Abre al instante con lo guardado en el celular y actualiza en segundo plano
+      try{ reconstruir(); }catch(e){ BASE=null; }
+    }
+    if(BASE){
+      await minimo; clearTimeout(lento); mostrarApp(); pintar(); quitarSplash(); pintarEstado();
+      if(navigator.onLine) sincronizar().catch(e=>{ if(!e.red) toast(e.message,true); });
+      else { ESTADO_RED='offline'; pintarEstado(); }
+      return;
+    }
+    try{ await sincronizar(); await minimo; clearTimeout(lento); mostrarApp(); quitarSplash(); return; }
+    catch(e){ fallo=e.red&&!navigator.onLine ? 'Necesitas internet la primera vez para descargar los datos del grupo a este celular.' : (e.message||String(e)); }
   }
   await minimo; clearTimeout(lento); quitarSplash();
   mostrarLogin();
@@ -413,7 +433,7 @@ async function mostrarLogin(){
     $('#loginTitulo').textContent = inf.nombre; document.title = inf.nombre;
     if(inf.clientId && !/^PEGA/.test(inf.clientId)) cargarGoogle(inf.clientId);
     else { $('#gbtn').classList.add('oculto'); $('#sepGoogle').textContent='Entra con un código a tu correo'; }
-  }catch(e){ toast('No se pudo conectar con el servidor. Revisa API_URL.',true); }
+  }catch(e){ toast(navigator.onLine?'No se pudo conectar con el servidor. Revisa API_URL.':'Necesitas internet para entrar la primera vez.',true); }
 }
 function cargarGoogle(cid){
   const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true;
@@ -426,7 +446,9 @@ function cargarGoogle(cid){
 async function entrar(acc, datos){
   const r = await correr(()=>api(acc,datos));
   TOKEN=r.token; ls.set('cg_token',TOKEN);
-  await correr(recargar); mostrarApp();
+  const prev=await kvGet('base');
+  if(!prev || !prev.yo || prev.yo.id!==r.yo.id){ await borrarLocal(); } else { OUTBOX=await kvGet('outbox')||[]; FALLIDOS=await kvGet('fallidos')||[]; }
+  await correr(sincronizar); mostrarApp(); pintarEstado();
 }
 async function pedirCodigo(){
   const e=$('#lgEmail').value.trim(); if(!e) return toast('Escribe tu correo',true);
@@ -450,10 +472,13 @@ function abrirPerfil(){
     <label class="campo"><span>Cambiar mi nombre</span><input type="text" id="pfNombre" value="${esc(D.yo.nombre)}"></label>
     <button class="btn full" onclick="accion('actualizarMiNombre',{nombre:$('#pfNombre').value},'Nombre actualizado')">Guardar nombre</button>
     ${!esInstalada()?'<button class="btn sec full" style="margin-top:10px" onclick="cerrarModal();instalarApp()">📲 Instalar en mi celular</button>':''}
+    <button class="btn gris full" style="margin-top:10px" onclick="cerrarModal();verSincronizacion()">💾 Datos en este celular · ${OUTBOX.length?OUTBOX.length+' por enviar':'sincronizado '+hace(ULTIMA_SYNC)}</button>
     <button class="btn bad full" style="margin-top:10px" onclick="salir()">Cerrar sesión</button>`);
 }
 async function salir(){
+  if(OUTBOX.length && !confirm('Tienes '+OUTBOX.length+' cambio(s) sin enviar. Si cierras sesión se perderán. ¿Cerrar de todos modos?')) return;
   try{ await api('cerrarSesion',{token:TOKEN}); }catch(e){}
+  await borrarLocal(); ls.del('cg_ultima');
   ls.del('cg_token'); TOKEN=null; location.reload();
 }
 
@@ -461,7 +486,8 @@ async function salir(){
 function irTab(t){ tab=t; window.scrollTo(0,0); pintar(); }
 function pintar(){
   if(!D) return;
-  aplicarTema();
+  aplicarTema(); pintarEstado();
+  const borrador = $('#avTexto') ? $('#avTexto').value : null;
   $('#hdrAvatar').textContent = iniciales(D.yo.nombre);
   const nAv = avisosNuevos(); const ba=$('#badgeAvisos'); ba.textContent=nAv; ba.classList.toggle('oculto',!nAv||tab==='avisos');
   $('#navAdmin').classList.toggle('oculto',!(D.yo.admin||esAdminB()));
@@ -473,6 +499,7 @@ function pintar(){
   $('#fab').classList.toggle('oculto', tab!=='cal');
   const v = {cal:vistaCalendario, cuentas:vistaCuentas, avisos:vistaAvisos, fondo:vistaFondo, admin:vistaAdmin}[tab];
   $('#vista').innerHTML = v ? v() : '';
+  if(borrador && $('#avTexto')) $('#avTexto').value = borrador;
   $('#hdrTitulo').textContent = {cal:'Calendario',cuentas:'Cuentas',avisos:'Tablero de avisos',fondo:'Fondo grupal',admin:'Administración'}[tab];
 }
 
@@ -667,7 +694,7 @@ function itemPago(p, conNombre){
 }
 function borrarEvento(id){
   if(!confirm('¿Borrar este evento? Se eliminarán también sus gastos y fotos.')) return;
-  correr(async()=>{ await api('borrarEvento',{id}); cerrarModal(); await recargar(); },'Evento borrado');
+  correr(async()=>{ await escribir('borrarEvento',{id}); cerrarModal(); },'Evento borrado').catch(()=>{});
 }
 function borrarPago(id){
   if(!confirm('¿Borrar este movimiento?')) return;
@@ -747,9 +774,9 @@ function guardarEvento(e,id){
     aplicaTodos:f.aplica.value==='todos', participantes:[...f.querySelectorAll('input[name=part]:checked')].map(c=>c.value),
     modoCuota:modo, montoTotal:modo==='total'?monto:0, montoPorPersona:modo==='porPersona'?monto:0};
   correr(async()=>{
-    const r=await api('guardarEvento',d); cerrarModal(); await recargar();
+    await escribir('guardarEvento',d); cerrarModal();
     if(!id){ diaSel=d.fecha; const dd=fdate(d.fecha); mesVista=new Date(dd.getFullYear(),dd.getMonth(),1); pintar(); }
-  }, id?'Cambios guardados':(puede('eventos')?'Evento creado':'Propuesta enviada al administrador'));
+  }, id?'Cambios guardados':(puede('eventos')?'Evento creado':'Propuesta enviada al administrador')).catch(()=>{});
   return false;
 }
 
@@ -778,9 +805,9 @@ async function enviarPago(e, eventoId){
   e.preventDefault(); const f=e.target;
   await correr(async()=>{
     const archivo = await leerArchivo(f.archivo.files[0]);
-    await api('registrarPago',{eventoId,monto:f.monto.value,nota:f.nota.value,archivo});
-    cerrarModal(); await recargar();
-  },'Enviado. Queda en revisión hasta que el admin lo valide.');
+    await escribir('registrarPago',{eventoId,monto:f.monto.value,nota:f.nota.value,archivo});
+    cerrarModal();
+  },'Enviado. Queda en revisión hasta que el admin lo valide.').catch(()=>{});
   return false;
 }
 function formPagoAdmin(eventoId, personaId, sugerido){
@@ -810,9 +837,9 @@ async function enviarPagoAdmin(e, eventoId){
   e.preventDefault(); const f=e.target;
   await correr(async()=>{
     const archivo = await leerArchivo(f.archivo.files[0]);
-    await api('registrarPago',{eventoId,personaId:f.persona.value,tipo:f.tipo.value,monto:f.monto.value,nota:f.nota.value,archivo});
-    cerrarModal(); await recargar();
-  },'Pago registrado');
+    await escribir('registrarPago',{eventoId,personaId:f.persona.value,tipo:f.tipo.value,monto:f.monto.value,nota:f.nota.value,archivo});
+    cerrarModal();
+  },'Pago registrado').catch(()=>{});
   return false;
 }
 function disponibleEn(pid, origen){
@@ -867,9 +894,9 @@ async function enviarGasto(e, eventoId, id){
   e.preventDefault(); const f=e.target;
   await correr(async()=>{
     const archivo=await leerArchivo(f.archivo.files[0]);
-    await api('guardarGasto',{id:id||null,eventoId,concepto:f.concepto.value,monto:f.monto.value,archivo});
-    cerrarModal(); await recargar();
-  },'Gasto guardado');
+    await escribir('guardarGasto',{id:id||null,eventoId,concepto:f.concepto.value,monto:f.monto.value,archivo});
+    cerrarModal();
+  },'Gasto guardado').catch(()=>{});
   return false;
 }
 async function subirFotos(eventoId, input){
@@ -878,15 +905,14 @@ async function subirFotos(eventoId, input){
     for(let i=0;i<files.length;i++){
       toast(`Subiendo foto ${i+1} de ${files.length}…`);
       const a=await leerArchivo(files[i]);
-      await api('subirFoto',{eventoId,archivo:a});
+      await escribir('subirFoto',{eventoId,archivo:a});
     }
-    await recargar();
-  },'Fotos subidas');
+  },'Fotos subidas').catch(()=>{});
   input.value='';
 }
 function opcionesFoto(id, archivoId){
   abrirModal('Foto', `<img src="${thumb(archivoId,1600)}" style="width:100%;border-radius:12px;background:#e2e8f0" alt="">
-    <div class="fila-btn"><a class="btn sec" style="text-decoration:none" target="_blank" href="https://drive.google.com/file/d/${archivoId}/view">Abrir original</a>
+    <div class="fila-btn">${linkOriginal(archivoId)?`<a class="btn sec" style="text-decoration:none" target="_blank" href="${linkOriginal(archivoId)}">Abrir original</a>`:''}
     <button class="btn bad" onclick="if(confirm('¿Borrar foto?'))accion('borrarFoto',{id:'${id}'},'Foto borrada')">Borrar</button></div>`);
 }
 
@@ -1121,7 +1147,7 @@ function confirmarBorrarPersona(id){
 }
 function borrarPersona(id){
   const bloquear=!!($('#bpBloq')&&$('#bpBloq').checked);
-  correr(async()=>{ await api('borrarPersona',{id,bloquear}); cerrarModal(); cerrarModal(); await recargar(); },'Cuenta eliminada');
+  correr(async()=>{ await escribir('borrarPersona',{id,bloquear}); cerrarModal(); cerrarModal(); },'Cuenta eliminada').catch(()=>{});
 }
 
 /* ==================== TABLERO DE AVISOS ==================== */
@@ -1162,7 +1188,7 @@ function itemAviso(a){
 async function publicarAviso(){
   const texto=$('#avTexto').value.trim(), f=$('#avFoto').files[0], fijar=!!($('#avFijar')&&$('#avFijar').checked);
   if(!texto && !f) return toast('Escribe el aviso',true);
-  await correr(async()=>{ const archivo=await leerArchivo(f); await api('publicarAviso',{texto,archivo,fijar}); await recargar(); },'Aviso publicado');
+  try{ await correr(async()=>{ const archivo=await leerArchivo(f); await escribir('publicarAviso',{texto,archivo,fijar}); },'Aviso publicado'); }catch(e){}
 }
 
 /* ==================== INSTALAR APP ==================== */
@@ -1361,10 +1387,10 @@ async function enviarArticulo(e, evId, id, otro){
   const d={id:id||null,eventoId:evId,paraTodos:f.para.value==='todos',personas:[...f.querySelectorAll('input[name=per]:checked')].map(x=>x.value),descripcion:f.desc.value,cantidad:f.cant.value};
   if(!d.paraTodos && !d.personas.length){ toast('Elige a quién le toca',true); return false; }
   await correr(async()=>{
-    await api('guardarArticulo',d);
-    if(otro){ f.desc.value=''; f.cant.value=''; f.querySelectorAll('input[name=per]').forEach(x=>x.checked=false); await recargar(); f.desc.focus(); }
-    else { cerrarModal(); await recargar(); }
-  }, otro?'Agregado. Escribe el siguiente':'Artículo guardado');
+    await escribir('guardarArticulo',d);
+    if(otro){ f.desc.value=''; f.cant.value=''; f.querySelectorAll('input[name=per]').forEach(x=>x.checked=false); f.desc.focus(); }
+    else { cerrarModal(); }
+  }, otro?'Agregado. Escribe el siguiente':'Artículo guardado').catch(()=>{});
   return false;
 }
 
@@ -1403,6 +1429,475 @@ function guardarPermisos(e,pid){
   accion('guardarPermisos',{personaId:pid,permisos},permisos.length?'Permisos guardados':'Ya no es administrador B');
   return false;
 }
+
+/* ==================== MODO SIN CONEXIÓN ==================== */
+/* Copia local (BASE) = últimos datos del servidor. OUTBOX = cambios hechos en el celular aún no enviados.
+   Lo que se ve en pantalla (D) = BASE + cambios pendientes aplicados localmente. */
+let BASE = null, OUTBOX = [], FALLIDOS = [], LOCALES = {}, ESTADO_RED = 'ok', ULTIMA_SYNC = 0, _ultOffline = false;
+
+/* ---- almacenamiento en el celular (IndexedDB, con respaldo en localStorage) ---- */
+let _idb = null;
+function idb(){
+  if(_idb) return _idb;
+  _idb = new Promise((res,rej)=>{
+    try{
+      const r = indexedDB.open('upmys-calendario',1);
+      r.onupgradeneeded = ()=>r.result.createObjectStore('kv');
+      r.onsuccess = ()=>res(r.result);
+      r.onerror = ()=>rej(r.error);
+    }catch(e){ rej(e); }
+  });
+  return _idb;
+}
+async function kvGet(k){
+  try{
+    const db = await idb();
+    return await new Promise((res,rej)=>{ const q=db.transaction('kv').objectStore('kv').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); });
+  }catch(e){ try{ const v=localStorage.getItem('kv_'+k); return v?JSON.parse(v):undefined; }catch(_){ return undefined; } }
+}
+async function kvSet(k,v){
+  try{
+    const db = await idb();
+    await new Promise((res,rej)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); });
+  }catch(e){ try{ localStorage.setItem('kv_'+k,JSON.stringify(v)); }catch(_){} }
+}
+async function guardarLocal(){ await kvSet('base',BASE); await kvSet('outbox',OUTBOX); await kvSet('fallidos',FALLIDOS); }
+async function borrarLocal(){ BASE=null; OUTBOX=[]; FALLIDOS=[]; await guardarLocal(); }
+
+/* ---- utilidades ---- */
+const nid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const ahoraLocal = () => { const d=new Date(); return ymd(d)+' '+pad(d.getHours())+':'+pad(d.getMinutes()); };
+const clonar = o => JSON.parse(JSON.stringify(o));
+const sumaM = (arr,campo='monto') => r2(arr.reduce((a,x)=>a+(Number(x[campo])||0),0));
+const puedeEn = (S,k) => S.yo.admin || (S.yo.permisos||[]).includes(k);
+function falla(msg){ throw new Error(msg); }
+
+/* ---- IDs para lo que se crea en el celular ---- */
+function asignarIds(op){
+  const d=op.datos;
+  switch(op.accion){
+    case 'guardarEvento': if(!d.id) d.cid=nid('E'); break;
+    case 'registrarPago': d.cid=nid('M'); break;
+    case 'moverSaldo': d.cids=[nid('M'),nid('M')]; break;
+    case 'guardarGasto': if(!d.id) d.cid=nid('G'); break;
+    case 'subirFoto': d.cid=nid('F'); break;
+    case 'movimientoFondo': d.cid=nid('B'); break;
+    case 'guardarPersona': if(!d.id) d.cid=nid('P'); break;
+    case 'publicarAviso': d.cid=nid('A'); break;
+    case 'guardarArticulo': if(!d.id) d.cids=(d.paraTodos?['*']:(d.personas||[])).map(()=>nid('R')); break;
+    case 'registrarEntrega': d.cid=nid('N'); break;
+  }
+}
+
+/* ---- archivos todavía no subidos: se muestran desde el celular ---- */
+function archivoLocal(a, op, suf){
+  if(!a || !a.base64) return '';
+  const id='local:'+op.opId+(suf||'');
+  LOCALES[id] = (a.tipo||'').startsWith('image/') ? 'data:'+a.tipo+';base64,'+a.base64 : '';
+  return id;
+}
+
+/* ---- buscadores sobre un estado S ---- */
+function evDe(S,id){ return S.eventos.find(e=>e.id===id); }
+function evAprobadoDe(S,id){ const e=evDe(S,id); if(!e||e.estado!=='aprobado') falla('Evento no disponible'); return e; }
+function persDe(S,id){ return S.personas.find(p=>p.id===id); }
+function nombreEn(S,id){ const p=persDe(S,id); return p?p.nombre:'—'; }
+function buscarMov(S,id){
+  for(const ev of S.eventos){ const i=ev.pagos.findIndex(m=>m.id===id); if(i>=0) return {lista:ev.pagos,i,m:ev.pagos[i],ev}; }
+  for(const p of S.personas){ const l=p.movsSaldo||[]; const i=l.findIndex(m=>m.id===id); if(i>=0) return {lista:l,i,m:l[i],p}; }
+  return null;
+}
+function buscarArt(S,id){ for(const ev of S.eventos){ const a=(ev.articulos||[]).find(x=>x.id===id); if(a) return {ev,a}; } return {}; }
+function agregarMov(S, eventoId, mov){
+  if(eventoId==='SALDO'){ const p=persDe(S,mov.personaId); if(!p) falla('Persona no encontrada'); (p.movsSaldo=p.movsSaldo||[]).unshift(mov); }
+  else evDe(S,eventoId).pagos.unshift(mov);
+}
+
+/* ---- cada cambio, aplicado en el celular (mismas reglas que el servidor) ---- */
+const REDUCTORES = {
+  guardarEvento(S,d,op){
+    const pEv=puedeEn(S,'eventos'), titulo=String(d.titulo||'').trim();
+    if(!titulo) falla('Escribe el nombre del evento');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha||'')) falla('Fecha no válida');
+    const modo=['ninguna','porPersona','total'].includes(d.modoCuota)?d.modoCuota:'ninguna';
+    if(!d.aplicaTodos && !(d.participantes||[]).length && modo!=='ninguna') falla('Selecciona al menos un participante');
+    const c={titulo,tipo:S.tipos.includes(d.tipo)?d.tipo:'Otro',fecha:d.fecha,hora:d.hora||'',lugar:d.lugar||'',descripcion:d.descripcion||'',
+      aplicaTodos:!!d.aplicaTodos,participantes:d.aplicaTodos?[]:(d.participantes||[]).slice(),modoCuota:modo,
+      montoTotal:modo==='total'?r2(d.montoTotal):0,montoPorPersona:modo==='porPersona'?r2(d.montoPorPersona):0};
+    if(d.id){
+      const ev=evDe(S,d.id); if(!ev) falla('Evento no encontrado');
+      if(!pEv){ if(ev.creadoPor!==S.yo.id||ev.estado==='aprobado') falla('No puedes editar este evento'); c.estado='propuesto'; }
+      Object.assign(ev,c);
+    } else {
+      S.eventos.push(Object.assign({id:d.cid,estado:pEv?'aprobado':'propuesto',creadoPor:S.yo.id,creadorNombre:S.yo.nombre,
+        pagos:[],gastos:[],fotos:[],articulos:[],cuentas:[],finanzas:{}},c));
+    }
+  },
+  revisarEvento(S,d){ if(!puedeEn(S,'propuestas')) falla('No tienes permiso'); const ev=evDe(S,d.id); if(!ev) falla('Evento no encontrado'); ev.estado=d.aprobar?'aprobado':'rechazado'; },
+  borrarEvento(S,d){
+    const ev=evDe(S,d.id); if(!ev) falla('Evento no encontrado');
+    if(!puedeEn(S,'eventos') && !(ev.creadoPor===S.yo.id && ev.estado!=='aprobado')) falla('No puedes borrar este evento');
+    if(ev.pagos.some(m=>m.estado!=='rechazado') || S.fondo.movimientos.some(f=>f.eventoId===d.id)) falla('El evento tiene pagos o movimientos del fondo. Muévelos o bórralos antes.');
+    S.eventos=S.eventos.filter(e=>e.id!==d.id);
+  },
+  registrarPago(S,d,op){
+    const monto=r2(d.monto); if(!(monto>0)) falla('Escribe un monto válido');
+    const eventoId=d.eventoId||'SALDO'; if(eventoId!=='SALDO') evAprobadoDe(S,eventoId);
+    const admin=S.yo.admin, cajero=!admin && puedeEn(S,'efectivo') && (d.tipo==='efectivo' || (d.personaId && d.personaId!==S.yo.id));
+    const pid=(admin||cajero)&&d.personaId?d.personaId:S.yo.id;
+    agregarMov(S,eventoId,{id:d.cid,personaId:pid,nombre:nombreEn(S,pid),
+      tipo:admin?(d.tipo==='transferencia'?'transferencia':'efectivo'):(cajero?'efectivo':'transferencia'),
+      monto,estado:(admin||cajero)?'validado':'pendiente',nota:d.nota||'',fecha:op.t,archivoId:archivoLocal(d.archivo,op)});
+  },
+  revisarPago(S,d){ if(!puedeEn(S,'validarPagos')) falla('No tienes permiso para validar transferencias'); const r=buscarMov(S,d.id); if(!r) falla('Pago no encontrado'); r.m.estado=d.aprobar?'validado':'rechazado'; },
+  borrarPago(S,d){
+    const r=buscarMov(S,d.id); if(!r) falla('Pago no encontrado');
+    if(!S.yo.admin && !(r.m.personaId===S.yo.id && r.m.estado==='pendiente')) falla('No puedes borrar este pago');
+    r.lista.splice(r.i,1);
+  },
+  moverSaldo(S,d,op){
+    const pid=S.yo.admin&&d.personaId?d.personaId:S.yo.id, monto=r2(d.monto), origen=d.origen||'SALDO', destino=d.destino||'SALDO';
+    if(!(monto>0)) falla('Monto no válido'); if(origen===destino) falla('El origen y el destino son iguales');
+    let disp, nO='Saldo a favor', nD='Saldo a favor';
+    if(origen==='SALDO') disp=(persDe(S,pid)||{}).saldoFavor||0;
+    else { const ev=evDe(S,origen); if(!ev) falla('Evento de origen no encontrado'); const c=ev.cuentas.find(x=>x.personaId===pid); disp=c?-c.saldo:0; nO=ev.titulo; }
+    if(destino!=='SALDO') nD=evAprobadoDe(S,destino).titulo;
+    if(monto>disp+0.001) falla('Solo hay $'+Math.max(0,disp).toFixed(2)+' disponibles para mover');
+    const b={personaId:pid,nombre:nombreEn(S,pid),tipo:'traspaso',estado:'validado',archivoId:'',fecha:op.t};
+    agregarMov(S,origen,Object.assign({},b,{id:d.cids[0],monto:-monto,nota:'Traspaso hacia: '+nD}));
+    agregarMov(S,destino,Object.assign({},b,{id:d.cids[1],monto,nota:'Traspaso desde: '+nO}));
+  },
+  guardarGasto(S,d,op){
+    if(!puedeEn(S,'gastos')) falla('No tienes permiso para registrar gastos');
+    const monto=r2(d.monto); if(!String(d.concepto||'').trim()) falla('Escribe el concepto'); if(!(monto>0)) falla('Monto no válido');
+    const arch=archivoLocal(d.archivo,op);
+    if(d.id){ for(const ev of S.eventos){ const g=ev.gastos.find(x=>x.id===d.id); if(g){ g.concepto=d.concepto; g.monto=monto; if(arch) g.archivoId=arch; return; } } falla('Gasto no encontrado'); }
+    const ev=evDe(S,d.eventoId); if(!ev) falla('Evento no encontrado');
+    ev.gastos.push({id:d.cid,concepto:d.concepto,monto,archivoId:arch,fecha:op.t});
+  },
+  borrarGasto(S,d){ if(!puedeEn(S,'gastos')) falla('No tienes permiso'); S.eventos.forEach(ev=>ev.gastos=ev.gastos.filter(g=>g.id!==d.id)); },
+  subirFoto(S,d,op){ if(!puedeEn(S,'gastos')) falla('No tienes permiso para subir fotos'); const ev=evDe(S,d.eventoId); if(!ev) falla('Evento no encontrado'); ev.fotos.push({id:d.cid,archivoId:archivoLocal(d.archivo,op)}); },
+  borrarFoto(S,d){ if(!puedeEn(S,'gastos')) falla('No tienes permiso'); S.eventos.forEach(ev=>ev.fotos=ev.fotos.filter(f=>f.id!==d.id)); },
+  movimientoFondo(S,d,op){
+    if(!S.yo.admin) falla('Solo el administrador puede hacer esto');
+    const monto=r2(d.monto); if(!(monto>0)) falla('Monto no válido');
+    const tipo=d.tipo==='egreso'?'egreso':'ingreso';
+    if(tipo==='egreso' && monto>S.fondo.saldo+0.001) falla('El fondo solo tiene $'+S.fondo.saldo.toFixed(2));
+    if(d.eventoId) evAprobadoDe(S,d.eventoId);
+    S.fondo.movimientos.unshift({id:d.cid,tipo,monto,eventoId:d.eventoId||'',concepto:d.concepto||'',fecha:op.t,eventoTitulo:''});
+  },
+  borrarFondo(S,d){ if(!S.yo.admin) falla('Solo el administrador puede hacer esto'); S.fondo.movimientos=S.fondo.movimientos.filter(m=>m.id!==d.id); },
+  guardarPersona(S,d){
+    const admin=S.yo.admin; if(!admin && !puedeEn(S,'personas')) falla('No tienes permiso para agregar personas');
+    const nombre=String(d.nombre||'').trim(); if(!nombre) falla('Escribe el nombre');
+    const email=String(d.email||'').trim().toLowerCase();
+    if(email && S.personas.some(p=>(p.email||'').toLowerCase()===email && p.id!==d.id)) falla('Ese correo ya está registrado');
+    if(d.id){
+      const p=persDe(S,d.id); if(!p) falla('Persona no encontrada');
+      if(!admin && p.rol==='admin') falla('No puedes editar a un administrador');
+      Object.assign(p,{nombre,email,tieneCuenta:!!email}); if(admin){ p.rol=d.rol==='admin'?'admin':'miembro'; p.activo=d.activo!==false; }
+    } else S.personas.push({id:d.cid,nombre,email,tieneCuenta:!!email,rol:admin&&d.rol==='admin'?'admin':'miembro',activo:admin?d.activo!==false:true,adminB:false,movsSaldo:[],detalle:[]});
+  },
+  guardarConfig(S,d){ if(!S.yo.admin) falla('Solo el administrador puede hacer esto'); ['banco','titular','clabe','cuenta','tarjeta','nota'].forEach(k=>{ if(k in d) S.banco[k]=String(d[k]); }); },
+  actualizarMiNombre(S,d){ const n=String(d.nombre||'').trim(); if(!n) falla('Escribe tu nombre'); const p=persDe(S,S.yo.id); if(p) p.nombre=n; S.yo.nombre=n; },
+  borrarPersona(S,d){
+    if(!S.yo.admin) falla('Solo el administrador puede hacer esto'); if(d.id===S.yo.id) falla('No puedes eliminar tu propia cuenta');
+    const p=persDe(S,d.id); if(!p) falla('Persona no encontrada');
+    const conPagos=S.eventos.some(ev=>ev.pagos.some(m=>m.personaId===d.id&&m.estado!=='rechazado')) || (p.movsSaldo||[]).some(m=>m.estado!=='rechazado');
+    if(conPagos) falla('Tiene pagos registrados. Márcala como Inactiva para conservar las cuentas del grupo.');
+    S.eventos=S.eventos.filter(ev=>!(ev.creadoPor===d.id && ev.estado!=='aprobado'));
+    S.eventos.forEach(ev=>{ ev.participantes=ev.participantes.filter(x=>x!==d.id); ev.pagos=ev.pagos.filter(m=>m.personaId!==d.id);
+      ev.articulos=(ev.articulos||[]).filter(a=>a.paraTodos||a.personaId!==d.id); });
+    S.avisos=S.avisos.filter(a=>a.personaId!==d.id);
+    if(S.permisos) delete S.permisos[d.id]; if(S.moderador===d.id) S.moderador='';
+    if(d.bloquear && p.email && !S.bloqueados.includes(p.email.toLowerCase())) S.bloqueados.push(p.email.toLowerCase());
+    S.personas=S.personas.filter(x=>x.id!==d.id);
+  },
+  desbloquearCorreo(S,d){ if(!S.yo.admin) falla('Solo el administrador puede hacer esto'); S.bloqueados=S.bloqueados.filter(e=>e!==String(d.email||'').toLowerCase()); },
+  guardarPersonalizacion(S,d){ if(!S.yo.admin) falla('Solo el administrador puede hacer esto'); if(d.tema) S.tema=d.tema; if(d.meses) S.meses=d.meses; if('moderador' in d) S.moderador=d.moderador||''; },
+  publicarAviso(S,d,op){
+    const texto=String(d.texto||'').trim(); if(!texto && !d.archivo) falla('Escribe el aviso'); if(texto.length>2000) falla('El aviso es muy largo (máx. 2000 caracteres)');
+    S.avisos.unshift({id:d.cid,personaId:S.yo.id,nombre:S.yo.nombre,texto,archivoId:archivoLocal(d.archivo,op),fijado:!!(d.fijar&&puedeEn(S,'avisos')),fecha:op.t,puedeBorrar:true});
+  },
+  borrarAviso(S,d){ const a=S.avisos.find(x=>x.id===d.id); if(!a) falla('Aviso no encontrado'); if(a.personaId!==S.yo.id && !puedeEn(S,'avisos')) falla('Solo el administrador o el moderador pueden borrar avisos de otros'); S.avisos=S.avisos.filter(x=>x.id!==d.id); },
+  fijarAviso(S,d){ if(!puedeEn(S,'avisos')) falla('Solo el administrador o el moderador pueden fijar avisos'); const a=S.avisos.find(x=>x.id===d.id); if(!a) falla('Aviso no encontrado'); a.fijado=!!d.fijar; },
+  guardarArticulo(S,d){
+    if(!puedeEn(S,'eventos')) falla('No tienes permiso para crear artículos');
+    const desc=String(d.descripcion||'').trim(); if(!desc) falla('Escribe qué hay que llevar');
+    const cantidad=Math.max(0,r2(d.cantidad));
+    if(d.id){
+      const {a}=buscarArt(S,d.id); if(!a) falla('Artículo no encontrado');
+      a.descripcion=desc; a.cantidad=cantidad;
+      if(d.paraTodos){ a.paraTodos=true; a.personaId=''; } else if(d.personas&&d.personas.length===1){ a.paraTodos=false; a.personaId=d.personas[0]; }
+      return;
+    }
+    const ev=evAprobadoDe(S,d.eventoId), dest=d.paraTodos?['*']:(d.personas||[]);
+    if(!dest.length) falla('Elige a quién le toca llevarlo');
+    dest.forEach((pid,i)=>ev.articulos.push({id:d.cids[i],paraTodos:pid==='*',personaId:pid==='*'?'':pid,descripcion:desc,cantidad,entregados:[],porConfirmar:[],avance:{},movs:[]}));
+  },
+  borrarArticulo(S,d){ if(!puedeEn(S,'eventos')) falla('No tienes permiso'); S.eventos.forEach(ev=>ev.articulos=(ev.articulos||[]).filter(a=>a.id!==d.id)); },
+  marcarEntrega(S,d){
+    const {a}=buscarArt(S,d.id); if(!a) falla('Artículo no encontrado');
+    const g=puedeEn(S,'articulos'), pid=d.personaId||S.yo.id;
+    if(!g && pid!==S.yo.id) falla('Solo puedes marcar tus propios artículos');
+    if(!a.asignados.includes(pid)) falla('Este artículo no está asignado a esa persona');
+    if(!g && a.entregados.includes(pid)) falla('El administrador ya lo confirmó como entregado');
+    a.entregados=a.entregados.filter(x=>x!==pid); a.porConfirmar=a.porConfirmar.filter(x=>x!==pid);
+    if(d.entregado) (g?a.entregados:a.porConfirmar).push(pid);
+  },
+  confirmarEntrega(S,d){
+    if(!puedeEn(S,'articulos')) falla('No tienes permiso para confirmar artículos');
+    const {a}=buscarArt(S,d.id); if(!a) falla('Artículo no encontrado');
+    a.entregados=a.entregados.filter(x=>x!==d.personaId); a.porConfirmar=a.porConfirmar.filter(x=>x!==d.personaId);
+    if(d.aprobar) a.entregados.push(d.personaId);
+  },
+  registrarEntrega(S,d,op){
+    const {a}=buscarArt(S,d.articuloId); if(!a) falla('Artículo no encontrado'); if(!(a.cantidad>0)) falla('Este artículo no lleva cantidad');
+    const g=puedeEn(S,'articulos'), pid=g&&d.personaId?d.personaId:S.yo.id;
+    if(!a.asignados.includes(pid)) falla('Este artículo no está asignado a esa persona');
+    const cant=r2(d.cantidad); if(!(cant>0)) falla('Escribe cuántos entregas');
+    const llevado=sumaM(a.movs.filter(x=>x.personaId===pid&&x.estado!=='rechazado'),'cantidad'), falta=r2(a.cantidad-llevado);
+    if(cant>falta+0.0001) falla(falta>0?'Solo faltan '+falta:'Ya está completo');
+    a.movs.unshift({id:d.cid,personaId:pid,nombre:nombreEn(S,pid),cantidad:cant,estado:g?'validado':'pendiente',fecha:op.t});
+  },
+  revisarEntrega(S,d){
+    if(!puedeEn(S,'articulos')) falla('No tienes permiso para confirmar artículos');
+    for(const ev of S.eventos) for(const a of (ev.articulos||[])){ const x=(a.movs||[]).find(m=>m.id===d.id); if(x){ x.estado=d.aprobar?'validado':'rechazado'; return; } }
+    falla('Entrega no encontrada');
+  },
+  borrarEntrega(S,d){
+    for(const ev of S.eventos) for(const a of (ev.articulos||[])){ const i=(a.movs||[]).findIndex(m=>m.id===d.id);
+      if(i>=0){ const x=a.movs[i]; if(!puedeEn(S,'articulos') && !(x.personaId===S.yo.id&&x.estado==='pendiente')) falla('No puedes borrar esta entrega'); a.movs.splice(i,1); return; } }
+    falla('Entrega no encontrada');
+  },
+  guardarPermisos(S,d){
+    if(!S.yo.admin) falla('Solo el administrador puede hacer esto');
+    const p=persDe(S,d.personaId); if(!p) falla('Persona no encontrada'); if(!p.email) falla('Solo puede ser administrador B alguien con cuenta (correo)');
+    const l=(d.permisos||[]).filter(k=>S.catalogoPermisos[k]);
+    S.permisos=S.permisos||{}; if(l.length) S.permisos[p.id]=l; else delete S.permisos[p.id];
+    if(S.moderador===p.id && !l.includes('avisos')) S.moderador='';
+  }
+};
+function aplicarOp(S, op){
+  const fn=REDUCTORES[op.accion]; if(!fn) falla('Acción no disponible sin conexión');
+  fn(S, op.datos||{}, op); recomputar(S);
+}
+
+/* ---- recalcula cuotas, saldos, avances y pendientes (igual que el servidor) ---- */
+function recomputar(S){
+  const nom=id=>nombreEn(S,id);
+  const activos=S.personas.filter(p=>p.activo).map(p=>p.id);
+  S.eventos.forEach(ev=>{
+    ev.pagos=ev.pagos||[]; ev.gastos=ev.gastos||[]; ev.fotos=ev.fotos||[]; ev.articulos=ev.articulos||[];
+    if(ev.aplicaTodos){ const prev=(ev.participantes||[]).filter(x=>activos.includes(x)); ev.participantes=prev.concat(activos.filter(x=>!prev.includes(x))); }
+    const part=ev.participantes||[], n=part.length;
+    ev.cuotaPP = ev.modoCuota==='porPersona' ? r2(ev.montoPorPersona) : (ev.modoCuota==='total'&&n ? r2(ev.montoTotal/n) : 0);
+    ev.totalEsperado=r2(ev.cuotaPP*n);
+    if(persDe(S,ev.creadoPor)) ev.creadorNombre=nom(ev.creadoPor);
+    ev.pagos.forEach(m=>m.nombre=nom(m.personaId));
+    const ids=part.slice(); ev.pagos.forEach(m=>{ if(!ids.includes(m.personaId)) ids.push(m.personaId); });
+    ev.cuentas=ids.map(pid=>{
+      const participa=part.includes(pid), cuota=participa?ev.cuotaPP:0, mias=ev.pagos.filter(m=>m.personaId===pid);
+      const pagado=sumaM(mias.filter(m=>m.estado==='validado')), revision=sumaM(mias.filter(m=>m.estado==='pendiente'));
+      return {personaId:pid,nombre:nom(pid),participa,cuota,pagado,revision,saldo:r2(cuota-pagado)};
+    }).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    const fEv=S.fondo.movimientos.filter(f=>f.eventoId===ev.id);
+    const rec=sumaM(ev.pagos.filter(m=>m.estado==='validado')), apo=sumaM(fEv.filter(f=>f.tipo==='egreso')), env=sumaM(fEv.filter(f=>f.tipo==='ingreso')), gas=sumaM(ev.gastos);
+    ev.finanzas={recaudado:rec,aportesFondo:apo,enviadoFondo:env,gastos:gas,resultado:r2(rec+apo-gas-env)};
+    ev.articulos.forEach(a=>{
+      a.asignados=a.paraTodos?part.slice():[a.personaId]; a.nombre=a.paraTodos?'Todos':nom(a.personaId);
+      a.cantidad=Number(a.cantidad)||0;
+      if(a.cantidad>0){
+        a.movs=(a.movs||[]).filter(x=>x.estado!=='rechazado' && a.asignados.includes(x.personaId));
+        a.movs.forEach(x=>x.nombre=nom(x.personaId)); a.avance={};
+        a.asignados.forEach(pid=>{ const mm=a.movs.filter(x=>x.personaId===pid);
+          a.avance[pid]={ok:sumaM(mm.filter(x=>x.estado==='validado'),'cantidad'),pend:sumaM(mm.filter(x=>x.estado==='pendiente'),'cantidad')}; });
+        a.entregados=a.asignados.filter(pid=>a.avance[pid].ok>=a.cantidad-0.0001);
+        a.porConfirmar=a.asignados.filter(pid=>a.avance[pid].pend>0);
+      } else {
+        a.movs=[]; a.avance={};
+        a.entregados=(a.entregados||[]).filter(x=>a.asignados.includes(x));
+        a.porConfirmar=(a.porConfirmar||[]).filter(x=>a.asignados.includes(x)&&!a.entregados.includes(x));
+      }
+    });
+  });
+  S.eventos.sort((a,b)=>(a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+  const aprob=S.eventos.filter(e=>e.estado==='aprobado');
+  S.personas.forEach(p=>{
+    let adeudo=0, exc=0; const det=[];
+    aprob.forEach(ev=>{ const c=ev.cuentas.find(x=>x.personaId===p.id); if(!c) return;
+      if(c.saldo>0) adeudo+=c.saldo; else exc+=-c.saldo;
+      det.push({eventoId:ev.id,titulo:ev.titulo,fecha:ev.fecha,cuota:c.cuota,pagado:c.pagado,revision:c.revision,saldo:c.saldo}); });
+    p.movsSaldo=p.movsSaldo||[];
+    p.adeudo=r2(adeudo); p.excedente=r2(exc); p.detalle=det;
+    p.saldoFavor=sumaM(p.movsSaldo.filter(m=>m.estado==='validado'));
+    p.enRevision=r2(S.eventos.reduce((s,ev)=>s+sumaM(ev.pagos.filter(m=>m.personaId===p.id&&m.estado==='pendiente')),0)+sumaM(p.movsSaldo.filter(m=>m.estado==='pendiente')));
+  });
+  const yoP=persDe(S,S.yo.id); if(yoP) S.yo.nombre=yoP.nombre;
+  S.fondo.movimientos.forEach(m=>{ const e=evDe(S,m.eventoId); m.eventoTitulo=e?e.titulo:''; });
+  S.fondo.saldo=r2(S.fondo.movimientos.reduce((s,m)=>s+(m.tipo==='ingreso'?1:-1)*(Number(m.monto)||0),0));
+  const mod=puedeEn(S,'avisos');
+  S.avisos.forEach(a=>{ a.nombre=nom(a.personaId); a.puedeBorrar=mod||a.personaId===S.yo.id; });
+  if(S.pendientes){
+    const P=S.pendientes;
+    P.pagos=[];
+    if(puedeEn(S,'validarPagos')){
+      S.eventos.forEach(ev=>ev.pagos.filter(m=>m.estado==='pendiente').forEach(m=>P.pagos.push({id:m.id,personaId:m.personaId,nombre:nom(m.personaId),monto:m.monto,eventoId:ev.id,eventoTitulo:ev.titulo,archivoId:m.archivoId,nota:m.nota,fecha:m.fecha})));
+      S.personas.forEach(p=>p.movsSaldo.filter(m=>m.estado==='pendiente').forEach(m=>P.pagos.push({id:m.id,personaId:p.id,nombre:p.nombre,monto:m.monto,eventoId:'SALDO',eventoTitulo:'Abono a saldo a favor',archivoId:m.archivoId,nota:m.nota,fecha:m.fecha})));
+      P.pagos.sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+    }
+    P.propuestas=puedeEn(S,'propuestas')?S.eventos.filter(e=>e.estado==='propuesto').map(e=>e.id):[];
+    P.entregas=[];
+    if(puedeEn(S,'articulos')) S.eventos.forEach(ev=>ev.articulos.forEach(a=>{
+      if(a.cantidad>0) a.movs.filter(m=>m.estado==='pendiente').forEach(m=>P.entregas.push({articuloId:a.id,entregaId:m.id,personaId:m.personaId,nombre:m.nombre,descripcion:a.descripcion,cantidad:m.cantidad,total:a.cantidad,llevaOk:a.avance[m.personaId].ok,eventoId:ev.id,eventoTitulo:ev.titulo,fecha:ev.fecha}));
+      else a.porConfirmar.forEach(pid=>P.entregas.push({articuloId:a.id,personaId:pid,nombre:nom(pid),descripcion:a.descripcion,eventoId:ev.id,eventoTitulo:ev.titulo,fecha:ev.fecha}));
+    }));
+  }
+}
+
+/* ---- arma lo que se ve: datos del servidor + cambios pendientes ---- */
+function reconstruir(){
+  if(!BASE) return;
+  const S=clonar(BASE); LOCALES={};
+  S.avisos=S.avisos||[]; S.bloqueados=S.bloqueados||[]; S.fondo=S.fondo||{saldo:0,movimientos:[]};
+  recomputar(S);
+  OUTBOX.forEach(op=>{ try{ aplicarOp(S,op); op.errorLocal=''; }catch(e){ op.errorLocal=e.message; } });
+  D=S;
+}
+
+/* ---- guardar un cambio (con o sin internet) ---- */
+async function escribir(accion, datos){
+  if(!BASE) throw new Error('Aún no hay datos en este celular. Conéctate a internet una vez.');
+  const op={opId:nid('O'),accion,datos:clonar(datos||{}),t:ahoraLocal()};
+  asignarIds(op);
+  aplicarOp(clonar(D), op);            // valida con las mismas reglas antes de aceptarlo
+  OUTBOX.push(op); await kvSet('outbox',OUTBOX);
+  reconstruir(); pintar(); refrescarModales(); pintarEstado();
+  _ultOffline=false;
+  if(!navigator.onLine){ _ultOffline=true; pintarEstado(); return {offline:true,op}; }
+  try{
+    const r=await sincronizar();
+    const err=(r.errores||[]).find(x=>x.opId===op.opId);
+    if(err){ FALLIDOS=FALLIDOS.filter(x=>x.opId!==op.opId); await kvSet('fallidos',FALLIDOS); pintarEstado(); throw new Error(err.error); }
+    return {op};
+  }catch(e){
+    if(e.red){ _ultOffline=true; return {offline:true,op}; }
+    throw e;
+  }
+}
+
+/* ---- enviar pendientes y traer lo nuevo ---- */
+let _sync=null;
+function sincronizar(){
+  if(_sync) return _sync;
+  _sync=(async()=>{
+    ESTADO_RED='sync'; pintarEstado();
+    try{
+      const errores=[]; let datosNuevos=null; const huboOps=OUTBOX.length>0;
+      const SIZE=3500000;
+      while(true){
+        const lote=[]; let tam=0;
+        for(const op of OUTBOX){ const j=JSON.stringify({opId:op.opId,accion:op.accion,datos:op.datos}).length; if(lote.length && tam+j>SIZE) break; lote.push(op); tam+=j; }
+        if(!lote.length){ if(!datosNuevos) datosNuevos=await api('datos'); break; }
+        const ultimo=lote.length===OUTBOX.length;
+        const r=await api('lote',{ops:lote.map(o=>({opId:o.opId,accion:o.accion,datos:o.datos})),sinDatos:!ultimo});
+        const hechos=new Set();
+        (r.resultados||[]).forEach(x=>{
+          hechos.add(x.opId);
+          const op=lote.find(o=>o.opId===x.opId);
+          const benigno=op && /^borrar/.test(op.accion) && /no encontrad/i.test(x.error||'');
+          if(!x.ok && !benigno && op) errores.push({opId:op.opId,accion:op.accion,datos:resumenDatos(op),t:op.t,error:x.error});
+        });
+        OUTBOX=OUTBOX.filter(o=>!hechos.has(o.opId));
+        await kvSet('outbox',OUTBOX);
+        if(r.datos){ datosNuevos=r.datos; if(!OUTBOX.length) break; }
+      }
+      const cambio=JSON.stringify(datosNuevos)!==JSON.stringify(BASE);
+      BASE=datosNuevos;
+      if(errores.length) FALLIDOS=FALLIDOS.concat(errores);
+      await guardarLocal();
+      ULTIMA_SYNC=Date.now(); ls.set('cg_ultima',String(ULTIMA_SYNC));
+      ESTADO_RED=OUTBOX.length?'pend':'ok';
+      reconstruir(); if(cambio || errores.length || huboOps){ pintar(); refrescarModales(); }
+      pintarEstado();
+      if(errores.length) toast(errores.length===1?'Un cambio no se pudo guardar. Toca el aviso de arriba.':errores.length+' cambios no se pudieron guardar. Toca el aviso de arriba.',true);
+      return {errores};
+    }catch(e){
+      ESTADO_RED = e.red ? 'offline' : 'error'; pintarEstado();
+      throw e;
+    }finally{ _sync=null; }
+  })();
+  return _sync;
+}
+function sincronizarCallado(){ return sincronizar().catch(()=>{}); }
+
+/* ---- indicador de conexión en el encabezado ---- */
+const NOMBRES_OP={guardarEvento:'Evento',revisarEvento:'Revisión de propuesta',borrarEvento:'Borrar evento',registrarPago:'Pago',revisarPago:'Validación de pago',
+  borrarPago:'Borrar pago',moverSaldo:'Traspaso de saldo',guardarGasto:'Gasto',borrarGasto:'Borrar gasto',subirFoto:'Foto',borrarFoto:'Borrar foto',
+  movimientoFondo:'Movimiento del fondo',borrarFondo:'Borrar movimiento del fondo',guardarPersona:'Persona',guardarConfig:'Datos bancarios',
+  actualizarMiNombre:'Mi nombre',borrarPersona:'Eliminar cuenta',desbloquearCorreo:'Desbloquear correo',guardarPersonalizacion:'Personalización',
+  publicarAviso:'Aviso',borrarAviso:'Borrar aviso',fijarAviso:'Fijar aviso',guardarArticulo:'Artículo',borrarArticulo:'Quitar artículo',
+  marcarEntrega:'Entrega de artículo',confirmarEntrega:'Confirmación de artículo',registrarEntrega:'Entrega parcial',revisarEntrega:'Confirmación de entrega',
+  borrarEntrega:'Borrar entrega',guardarPermisos:'Permisos'};
+function resumenDatos(op){
+  const d=op.datos||{};
+  const t=d.titulo||d.descripcion||d.concepto||d.texto||d.nombre||'';
+  return (t?String(t).slice(0,50):'')+(d.monto?(t?' · ':'')+fmt(d.monto):'')+(d.cantidad&&op.accion==='registrarEntrega'?' · '+d.cantidad:'');
+}
+function pintarEstado(){
+  const el=$('#estadoRed'); if(!el) return;
+  const n=OUTBOX.length, f=FALLIDOS.length;
+  let h='';
+  if(f) h=`<span class="red-chip err">⚠️ ${f}</span>`;
+  if(ESTADO_RED==='sync') h+=`<span class="red-chip">↻ Sincronizando${n?' '+n:''}</span>`;
+  else if(!navigator.onLine || ESTADO_RED==='offline') h+=`<span class="red-chip off">📴 Sin conexión${n?' · '+n+' pendiente'+(n>1?'s':''):''}</span>`;
+  else if(n) h+=`<span class="red-chip">⏳ ${n} pendiente${n>1?'s':''}</span>`;
+  else if(ESTADO_RED==='error') h+=`<span class="red-chip err">⚠️ Sin sincronizar</span>`;
+  el.innerHTML=h;
+}
+function hace(ms){ if(!ms) return 'nunca'; const m=Math.round((Date.now()-ms)/60000); if(m<1) return 'hace un momento'; if(m<60) return 'hace '+m+' min'; const h=Math.round(m/60); if(h<24) return 'hace '+h+' h'; return new Date(ms).toLocaleString('es-MX'); }
+function verSincronizacion(){
+  const m=abrirModal('Datos en este celular', ()=>{
+    const enLinea=navigator.onLine;
+    return `<div class="card"><div class="renglon"><span>Conexión</span><b>${enLinea?'🟢 En línea':'📴 Sin conexión'}</b></div>
+      <div class="renglon"><span>Última sincronización</span><b>${hace(ULTIMA_SYNC)}</b></div>
+      <div class="renglon"><span>Cambios por enviar</span><b>${OUTBOX.length}</b></div></div>
+      <div class="aviso">Todo lo que ves está guardado en tu celular. Puedes seguir usando la app sin internet; los cambios se envían solos cuando vuelva la señal.</div>
+      ${OUTBOX.length?`<div class="titulo-sec"><span>Pendientes de enviar</span></div><div class="card" style="padding:4px 12px">${OUTBOX.map(o=>`<div class="item">
+        <div class="cuerpo"><b>${esc(NOMBRES_OP[o.accion]||o.accion)}</b><div class="sub">${esc(resumenDatos(o))}${resumenDatos(o)?' · ':''}${esc(o.t)}</div>
+        ${o.errorLocal?`<div class="sub rojo">${esc(o.errorLocal)}</div>`:''}</div>
+        <button class="btn chico gris" onclick="descartarOp('${o.opId}')">Descartar</button></div>`).join('')}</div>`:''}
+      ${FALLIDOS.length?`<div class="titulo-sec"><span>No se pudieron guardar</span><button class="btn chico gris" onclick="limpiarFallidos()">Limpiar</button></div>
+        <div class="card" style="padding:4px 12px">${FALLIDOS.map(x=>`<div class="item"><div class="cuerpo"><b>${esc(NOMBRES_OP[x.accion]||x.accion)}</b>
+        <div class="sub">${esc(x.datos||'')}${x.datos?' · ':''}${esc(x.t||'')}</div><div class="sub rojo">${esc(x.error)}</div></div></div>`).join('')}</div>
+        <div class="sub" style="margin:-4px 4px 12px">Otra persona pudo haber cambiado lo mismo antes. Revisa y vuelve a hacerlo si hace falta.</div>`:''}
+      <button class="btn full" onclick="sincronizarAhora()" ${enLinea?'':'disabled style="opacity:.5"'}>↻ Sincronizar ahora</button>`;
+  });
+  m.vivo=true;
+}
+async function sincronizarAhora(){
+  cargando(true);
+  try{ await sincronizar(); toast(OUTBOX.length?'Quedan cambios por enviar':'Todo sincronizado ✓'); }
+  catch(e){ toast(e.message,true); }
+  finally{ cargando(false); }
+}
+async function descartarOp(opId){
+  if(!confirm('¿Descartar este cambio? No se enviará.')) return;
+  OUTBOX=OUTBOX.filter(o=>o.opId!==opId); await kvSet('outbox',OUTBOX);
+  reconstruir(); pintar(); refrescarModales(); pintarEstado();
+}
+async function limpiarFallidos(){ FALLIDOS=[]; await kvSet('fallidos',FALLIDOS); refrescarModales(); pintarEstado(); }
+
+/* ---- sincronización automática ---- */
+window.addEventListener('online', ()=>{ pintarEstado(); if(TOKEN&&BASE) sincronizarCallado(); });
+window.addEventListener('offline', ()=>{ ESTADO_RED='offline'; pintarEstado(); });
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible' && TOKEN && BASE && navigator.onLine && (OUTBOX.length || Date.now()-ULTIMA_SYNC>60000)) sincronizarCallado();
+});
+setInterval(()=>{
+  if(document.visibilityState!=='visible' || !TOKEN || !BASE || !navigator.onLine) return;
+  if(OUTBOX.length || Date.now()-ULTIMA_SYNC>300000) sincronizarCallado();
+}, 60000);
 
 iniciar();
 </script>
