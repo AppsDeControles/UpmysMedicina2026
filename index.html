@@ -440,7 +440,7 @@ function pintar(){
   $('#navAdmin').classList.toggle('oculto',!D.yo.admin);
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.tab===tab));
   if(D.yo.admin){
-    const n = D.pendientes.pagos.length + D.pendientes.propuestas.length;
+    const n = D.pendientes.pagos.length + D.pendientes.propuestas.length + (D.pendientes.entregas||[]).length;
     const b=$('#badgeAdmin'); b.textContent=n; b.classList.toggle('oculto',!n);
   }
   $('#fab').classList.toggle('oculto', tab!=='cal');
@@ -497,7 +497,7 @@ function vistaCalendario(){
   } else if(filtroLista==='debo'){
     lista=D.eventos.filter(e=>{const c=miCuenta(e); return e.estado==='aprobado' && c && c.saldo>0.009}); tituloLista='Con pago pendiente';
   } else if(filtroLista==='llevo'){
-    lista=D.eventos.filter(e=>e.estado==='aprobado' && misArticulos(e).some(a=>!a.entregados.includes(D.yo.id))); tituloLista='Me toca llevar';
+    lista=D.eventos.filter(e=>e.estado==='aprobado' && misArticulos(e).some(a=>estadoArt(a,D.yo.id)==='pend')); tituloLista='Me toca llevar';
   } else {
     lista=D.eventos.filter(e=>e.fecha>=h && e.estado!=='rechazado'); tituloLista='Próximos eventos';
   }
@@ -968,6 +968,12 @@ function vistaAdmin(){
         <div class="fila-btn" style="margin-top:6px"><button class="btn chico ok" onclick="accion('revisarPago',{id:'${p.id}',aprobar:true},'Pago validado',false)">✓ Validar</button>
         <button class="btn chico bad" onclick="accion('revisarPago',{id:'${p.id}',aprobar:false},'Pago rechazado',false)">Rechazar</button></div></div></div>`).join('') : '<div class="vacio">Nada por validar 🎉</div>'}</div>
 
+    ${(P.entregas||[]).length?`<div class="titulo-sec"><span>Artículos por confirmar (${P.entregas.length})</span></div>
+    <div class="card" style="padding:4px 12px">${P.entregas.map(x=>`<div class="item"><div class="mini" style="display:flex;align-items:center;justify-content:center">🎁</div>
+      <div class="cuerpo"><b>${esc(x.nombre)}</b> · ${esc(x.descripcion)}<div class="sub" style="cursor:pointer" onclick="abrirEvento('${x.eventoId}')">${esc(x.eventoTitulo)} · ${fechaLarga(x.fecha)}</div>
+        <div class="fila-btn" style="margin-top:6px"><button class="btn chico ok" onclick="accion('confirmarEntrega',{id:'${x.articuloId}',personaId:'${x.personaId}',aprobar:true},'Entrega confirmada',false)">✓ Recibido</button>
+        <button class="btn chico bad" onclick="accion('confirmarEntrega',{id:'${x.articuloId}',personaId:'${x.personaId}',aprobar:false},'Regresado a pendiente',false)">No lo recibí</button></div></div></div>`).join('')}</div>`:''}
+
     <div class="titulo-sec"><span>Fechas propuestas (${props.length})</span></div>
     ${props.length? props.map(tarjetaEvento).join('') : '<div class="card vacio">Sin propuestas pendientes</div>'}
 
@@ -1178,8 +1184,10 @@ async function instalarApp(){
 
 /* ==================== ARTÍCULOS A LLEVAR ==================== */
 function misArticulos(ev){ return (ev.articulos||[]).filter(a=>a.asignados.includes(D.yo.id)); }
+function estadoArt(a,pid){ return a.entregados.includes(pid)?'ok':((a.porConfirmar||[]).includes(pid)?'conf':'pend'); }
+const CHIP_ART={ok:'<span class="chip ok">Entregado</span>',conf:'<span class="chip pri">⏳ Por confirmar</span>',pend:'<span class="chip warn">Pendiente</span>'};
 function chipArticulos(ev){
-  const p=misArticulos(ev).filter(a=>!a.entregados.includes(D.yo.id)); if(!p.length) return '';
+  const p=misArticulos(ev).filter(a=>estadoArt(a,D.yo.id)==='pend'); if(!p.length) return '';
   return `<span class="chip warn" style="max-width:100%;overflow:hidden;text-overflow:ellipsis">🎁 Llevar: ${esc(p[0].descripcion)}${p.length>1?' +'+(p.length-1):''}</span>`;
 }
 function seccionArticulos(ev){
@@ -1189,30 +1197,40 @@ function seccionArticulos(ev){
   if(!arts.length) return h+'<div class="card vacio">Sin artículos asignados. Usa “+ Artículo” para pedir flores, papel, tela, etc.</div>';
   const mios=misArticulos(ev);
   if(mios.length){
-    h+=`<div class="card" style="border:2px solid var(--pri)"><div class="sub">Te toca llevar</div>${mios.map(a=>{const ok=a.entregados.includes(D.yo.id);
-      return `<div class="item"><div class="cuerpo"><b>${esc(a.descripcion)}</b></div>
-        <button class="btn chico ${ok?'ok':'sec'}" onclick="accion('marcarEntrega',{id:'${a.id}',entregado:${!ok}},'${ok?'Marcado como pendiente':'¡Gracias! Marcado como entregado'}',false)">${ok?'✓ Entregado':'Marcar entregado'}</button></div>`}).join('')}</div>`;
+    h+=`<div class="card" style="border:2px solid var(--pri)"><div class="sub">Te toca llevar</div>${mios.map(a=>`<div class="item"><div class="cuerpo"><b>${esc(a.descripcion)}</b></div>${botonMiEntrega(a)}</div>`).join('')}
+      <div class="sub" style="margin-top:6px">Al marcarlo, el administrador confirma que lo recibió.</div></div>`;
   }
   const gen=arts.filter(a=>a.paraTodos), ind=arts.filter(a=>!a.paraTodos).sort((x,y)=>x.nombre.localeCompare(y.nombre));
   h+=`<div class="card" style="padding:4px 12px">`;
   gen.forEach(a=>{ const listo=a.asignados.length&&a.entregados.length>=a.asignados.length;
     h+=`<div class="item" style="cursor:pointer" onclick="verArticulo('${ev.id}','${a.id}')"><div class="mini" style="display:flex;align-items:center;justify-content:center">👥</div>
-      <div class="cuerpo"><b>${esc(a.descripcion)}</b><div class="sub">Cada participante</div></div>
+      <div class="cuerpo"><b>${esc(a.descripcion)}</b><div class="sub">Cada participante${(a.porConfirmar||[]).length?` · ${a.porConfirmar.length} por confirmar`:''}</div></div>
       <span class="chip ${listo?'ok':'warn'}">${a.entregados.length}/${a.asignados.length}</span></div>`; });
-  ind.forEach(a=>{ const ok=a.entregados.length>0;
+  ind.forEach(a=>{ const st=estadoArt(a,a.personaId);
     h+=`<div class="item" style="cursor:pointer" onclick="verArticulo('${ev.id}','${a.id}')"><div class="mini" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--pri);background:var(--pri2)">${esc(iniciales(a.nombre))}</div>
       <div class="cuerpo"><b>${esc(a.nombre)}</b><div class="sub">${esc(a.descripcion)}</div></div>
-      <span class="chip ${ok?'ok':'warn'}">${ok?'Entregado':'Pendiente'}</span></div>`; });
+      ${CHIP_ART[st]}</div>`; });
   return h+'</div>';
+}
+function botonMiEntrega(a){
+  const st=estadoArt(a,D.yo.id);
+  if(yoAdmin()) return `<button class="btn chico ${st==='ok'?'ok':'sec'}" onclick="accion('marcarEntrega',{id:'${a.id}',entregado:${st!=='ok'}},'Actualizado',false)">${st==='ok'?'✓ Entregado':'Marcar entregado'}</button>`;
+  if(st==='ok') return '<span class="chip ok">✓ Entregado</span>';
+  if(st==='conf') return `<button class="btn chico gris" onclick="accion('marcarEntrega',{id:'${a.id}',entregado:false},'Aviso cancelado',false)">⏳ Por confirmar · cancelar</button>`;
+  return `<button class="btn chico sec" onclick="accion('marcarEntrega',{id:'${a.id}',entregado:true},'Listo, el administrador lo confirmará',false)">Ya lo llevé</button>`;
 }
 function verArticulo(evId, artId){
   const m=abrirModal('Artículo', ()=>{
     const ev=evento(evId); if(!ev) return null; const a=(ev.articulos||[]).find(x=>x.id===artId); if(!a) return null;
     const adm=yoAdmin();
-    const filas=a.asignados.map(pid=>{ const ok=a.entregados.includes(pid), puede=adm||pid===D.yo.id;
-      return `<tr><td><b>${esc(persona(pid).nombre)}</b></td><td class="der">${puede
-        ?`<button class="btn chico ${ok?'ok':'gris'}" onclick="accion('marcarEntrega',{id:'${a.id}',personaId:'${pid}',entregado:${!ok}},'Actualizado',false)">${ok?'✓ Entregado':'Pendiente'}</button>`
-        :`<span class="chip ${ok?'ok':'warn'}">${ok?'Entregado':'Pendiente'}</span>`}</td></tr>`; }).join('');
+    const filas=a.asignados.map(pid=>{ const st=estadoArt(a,pid);
+      let celda;
+      if(adm && st==='conf') celda=`<button class="btn chico ok" onclick="accion('confirmarEntrega',{id:'${a.id}',personaId:'${pid}',aprobar:true},'Entrega confirmada',false)">✓ Confirmar</button>
+        <button class="btn chico bad" onclick="accion('confirmarEntrega',{id:'${a.id}',personaId:'${pid}',aprobar:false},'Regresado a pendiente',false)">✕</button>`;
+      else if(adm) celda=`<button class="btn chico ${st==='ok'?'ok':'gris'}" onclick="accion('marcarEntrega',{id:'${a.id}',personaId:'${pid}',entregado:${st!=='ok'}},'Actualizado',false)">${st==='ok'?'✓ Entregado':'Pendiente'}</button>`;
+      else if(pid===D.yo.id) celda=botonMiEntrega(a);
+      else celda=CHIP_ART[st];
+      return `<tr><td><b>${esc(persona(pid).nombre)}</b></td><td class="der">${celda}</td></tr>`; }).join('');
     return `<div class="card"><div class="sub">${a.paraTodos?'Cada participante lleva':'Le toca a '+esc(a.nombre)}</div><h3 style="margin:4px 0 0">${esc(a.descripcion)}</h3></div>
       <div class="card" style="padding:4px 12px"><table class="tabla">${filas||'<tr><td class="sub">Sin participantes</td></tr>'}</table></div>
       ${adm?`<div class="fila-btn"><button class="btn gris" onclick="formArticulo('${evId}','${a.id}')">✏️ Editar</button>
